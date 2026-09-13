@@ -3,6 +3,7 @@ import glob
 import re
 import json
 import hashlib
+from datetime import datetime, timezone, timedelta
 import pandas as pd
 import streamlit as st
 import plotly.express as px
@@ -13,7 +14,13 @@ st.set_page_config(page_title="월간 업계 동향 통합 인텔리전스", lay
 
 DATA_DIR = "./data"
 USER_DB_FILE = "users.json"
+LOG_DB_FILE = "activity_logs.json"
 os.makedirs(DATA_DIR, exist_ok=True)
+
+# 한국 표준시(KST) 구하기
+def get_now_kst():
+    kst = timezone(timedelta(hours=9))
+    return datetime.now(kst)
 
 # 비밀번호 암호화 함수
 def hash_password(password):
@@ -22,7 +29,6 @@ def hash_password(password):
 # 회원 DB 로드 및 저장
 def load_users():
     if not os.path.exists(USER_DB_FILE):
-        # 기본 마스터 계정 생성 (아이디: admin / 비밀번호: admin1234)
         default_users = {
             "admin": {
                 "name": "마스터 관리자",
@@ -44,19 +50,89 @@ def save_users(users_dict):
     with open(USER_DB_FILE, "w", encoding="utf-8") as f:
         json.dump(users_dict, f, ensure_ascii=False, indent=4)
 
+# 활동 로그 기록 함수 (최근 1,000건 보관)
+def log_activity(username, user_name, action, details=""):
+    now = get_now_kst()
+    timestamp_str = now.strftime("%Y-%m-%d %H:%M:%S")
+    
+    logs = []
+    if os.path.exists(LOG_DB_FILE):
+        try:
+            with open(LOG_DB_FILE, "r", encoding="utf-8") as f:
+                logs = json.load(f)
+        except Exception:
+            logs = []
+            
+    logs.append({
+        "timestamp": timestamp_str,
+        "username": username,
+        "name": user_name,
+        "action": action,
+        "details": details
+    })
+    
+    if len(logs) > 1000:
+        logs = logs[-1000:]
+        
+    try:
+        with open(LOG_DB_FILE, "w", encoding="utf-8") as f:
+            json.dump(logs, f, ensure_ascii=False, indent=4)
+    except Exception:
+        pass
+
+def load_activity_logs():
+    if not os.path.exists(LOG_DB_FILE):
+        return pd.DataFrame(columns=["일시", "아이디", "이름", "활동 구분", "상세 내역"])
+    try:
+        with open(LOG_DB_FILE, "r", encoding="utf-8") as f:
+            logs = json.load(f)
+        df_l = pd.DataFrame(logs)
+        if not df_l.empty:
+            df_l = df_l.rename(columns={
+                "timestamp": "일시",
+                "username": "아이디",
+                "name": "이름",
+                "action": "활동 구분",
+                "details": "상세 내역"
+            })
+            return df_l.sort_values(by="일시", ascending=False)
+        return pd.DataFrame(columns=["일시", "아이디", "이름", "활동 구분", "상세 내역"])
+    except Exception:
+        return pd.DataFrame(columns=["일시", "아이디", "이름", "활동 구분", "상세 내역"])
+
 users_db = load_users()
 
-# 세션 상태 초기화
+# --- 세션 상태 초기화 및 새로고침(F5) 유지 처리 ---
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
     st.session_state["username"] = None
     st.session_state["role"] = None
     st.session_state["user_name"] = None
+    st.session_state["login_time"] = None
+
+# URL 파라미터 기반 F5 새로고침 로그인 복원
+auth_token = st.query_params.get("user", None)
+if auth_token and not st.session_state["logged_in"]:
+    users_current = load_users()
+    if auth_token in users_current and users_current[auth_token].get("approved", False):
+        st.session_state["logged_in"] = True
+        st.session_state["username"] = auth_token
+        st.session_state["role"] = users_current[auth_token].get("role", "member")
+        st.session_state["user_name"] = users_current[auth_token].get("name", auth_token)
+        st.session_state["login_time"] = get_now_kst()
 
 # --- 2. 엑셀 데이터 파싱 함수 ---
 @st.cache_data
 def load_all_data():
-    all_files = glob.glob("업계동향_*.xlsx") + glob.glob(f"{DATA_DIR}/*.xlsx")
+    raw_files = glob.glob("**/*.[xX][lL][sS][xX]", recursive=True)
+    all_files = []
+    for f in raw_files:
+        filename = os.path.basename(f)
+        if filename.startswith("~$"):
+            continue
+        if "업계동향" in filename or "data" in f.lower():
+            all_files.append(f)
+            
     all_files = sorted(list(set(all_files)))
     
     issues_list = []
@@ -172,7 +248,7 @@ def load_all_data():
             
     return pd.DataFrame(issues_list), pd.DataFrame(tv_sales_list), pd.DataFrame(pt_list), pd.DataFrame(agency_sales_list), all_files
 
-# --- 3. 로그인 및 회원가입 화면 (비로그인 상태) ---
+# --- 3. 로그인 및 회원가입 화면 ---
 if not st.session_state["logged_in"]:
     st.title("🔒 월간 미디어·광고 동향 대시보드")
     st.caption("사내 인가된 사용자 전용 시스템입니다. 회원가입 후 관리자 승인을 거쳐 접속할 수 있습니다.")
@@ -196,6 +272,11 @@ if not st.session_state["logged_in"]:
                             st.session_state["username"] = login_id
                             st.session_state["role"] = user_info.get("role", "member")
                             st.session_state["user_name"] = user_info.get("name", login_id)
+                            st.session_state["login_time"] = get_now_kst()
+                            
+                            st.query_params["user"] = login_id
+                            log_activity(login_id, st.session_state["user_name"], "로그인", "시스템 로그인 성공")
+                            
                             st.success(f"환영합니다, {st.session_state['user_name']}님!")
                             st.rerun()
                         else:
@@ -229,6 +310,7 @@ if not st.session_state["logged_in"]:
                         "approved": False
                     }
                     save_users(users_current)
+                    log_activity(new_id, new_name, "회원가입 신청", f"아이디 '{new_id}' 가입 신청")
                     st.success("🎉 회원가입 신청이 완료되었습니다! 관리자 승인 후 로그인하실 수 있습니다.")
     st.stop()
 
@@ -236,18 +318,36 @@ if not st.session_state["logged_in"]:
 df_issues, df_tv, df_pt, df_agency, loaded_files = load_all_data()
 df_pt_unique = df_pt.drop_duplicates(subset=["PT일자", "광고주", "품목"]) if not df_pt.empty else pd.DataFrame()
 
-# 사이드바
+# 체류 시간 계산 문자열
+def get_stay_duration_str():
+    if st.session_state.get("login_time"):
+        delta = get_now_kst() - st.session_state["login_time"]
+        minutes = int(delta.total_seconds() // 60)
+        seconds = int(delta.total_seconds() % 60)
+        return f"{minutes}분 {seconds}초"
+    return "집계 불가"
+
+# 사이드바 설정
 st.sidebar.title("⚙️ 설정 및 제어판")
 st.sidebar.write(f"접속자: **{st.session_state['user_name']}** (`{st.session_state['role']}`)")
+st.sidebar.caption(f"현재 세션 체류 시간: **{get_stay_duration_str()}**")
 
 if st.sidebar.button("로그아웃"):
+    log_activity(
+        st.session_state["username"], 
+        st.session_state["user_name"], 
+        "로그아웃", 
+        f"총 체류 시간: {get_stay_duration_str()}"
+    )
     st.session_state["logged_in"] = False
     st.session_state["username"] = None
     st.session_state["role"] = None
     st.session_state["user_name"] = None
+    st.session_state["login_time"] = None
+    st.query_params.clear()
     st.rerun()
 
-# --- 회원 정보 변경 메뉴 (공통) ---
+# --- 내 정보 관리 ---
 with st.sidebar.expander("👤 내 정보 관리", expanded=False):
     with st.form("edit_profile_form"):
         curr_user_id = st.session_state["username"]
@@ -257,7 +357,7 @@ with st.sidebar.expander("👤 내 정보 관리", expanded=False):
         st.caption(f"아이디: **{curr_user_id}**")
         edit_name = st.text_input("이름(실명)", value=my_info.get("name", ""))
         curr_pw_input = st.text_input("현재 비밀번호 확인", type="password")
-        new_pw_input = st.text_input("새 비밀번호 (변경 시에만 입력)", type="password")
+        new_pw_input = st.text_input("새 비밀번호 (변경 시에만)", type="password")
         new_pw_confirm = st.text_input("새 비밀번호 확인", type="password")
         
         save_profile_btn = st.form_submit_button("정보 저장")
@@ -268,7 +368,6 @@ with st.sidebar.expander("👤 내 정보 관리", expanded=False):
             elif hash_password(curr_pw_input) != my_info.get("password"):
                 st.error("현재 비밀번호가 일치하지 않습니다.")
             else:
-                # 비밀번호 변경 검증
                 if new_pw_input:
                     if new_pw_input != new_pw_confirm:
                         st.error("새 비밀번호 확인이 일치하지 않습니다.")
@@ -278,6 +377,7 @@ with st.sidebar.expander("👤 내 정보 관리", expanded=False):
                         users_current[curr_user_id] = my_info
                         save_users(users_current)
                         st.session_state["user_name"] = edit_name
+                        log_activity(curr_user_id, edit_name, "정보수정", "비밀번호 및 이름 변경")
                         st.success("비밀번호 및 회원 정보가 성공적으로 변경되었습니다!")
                         st.rerun()
                 else:
@@ -285,22 +385,23 @@ with st.sidebar.expander("👤 내 정보 관리", expanded=False):
                     users_current[curr_user_id] = my_info
                     save_users(users_current)
                     st.session_state["user_name"] = edit_name
+                    log_activity(curr_user_id, edit_name, "정보수정", "이름 변경")
                     st.success("회원 정보가 성공적으로 변경되었습니다!")
                     st.rerun()
 
-# 1. Streamlit Secrets(비밀 금고)에 등록된 키가 있는지 먼저 확인
-api_key = st.secrets.get("GEMINI_API_KEY", None)
+st.sidebar.markdown("---")
 
-# 2. 금고에 키가 없을 때만 사이드바 입력창을 띄우고, 있으면 자동 연동 표시
+# Secrets 자동 연동 처리
+api_key = st.secrets.get("GEMINI_API_KEY", None)
 if not api_key:
     api_key = st.sidebar.text_input("🔑 Gemini API Key (선택)", type="password", help="API 키를 입력하면 AI 탭이 활성화됩니다.")
 else:
     st.sidebar.caption("🤖 Gemini AI 연동 활성화됨")
 
-# 마스터 전용 관리 기능
+# --- 마스터 전용 관리 기능 ---
 if st.session_state["role"] == "admin":
     st.sidebar.markdown("---")
-    st.sidebar.subheader("👑 마스터 관리 메뉴")
+    st.sidebar.subheader("👑 마스터 전용 메뉴")
     
     # 신규 엑셀 업로드
     new_file = st.sidebar.file_uploader("월간 엑셀 추가 (.xlsx)", type=["xlsx"])
@@ -309,6 +410,7 @@ if st.session_state["role"] == "admin":
         with open(save_path, "wb") as f:
             f.write(new_file.getbuffer())
         st.sidebar.success(f"{new_file.name} 저장 완료!")
+        log_activity(st.session_state["username"], st.session_state["user_name"], "엑셀 업로드", f"파일: {new_file.name}")
         st.cache_data.clear()
         st.rerun()
         
@@ -322,24 +424,131 @@ if st.session_state["role"] == "admin":
             for uid, info in pending_users.items():
                 st.write(f"- {info.get('name', uid)} (`{uid}`)")
                 col_app, col_del = st.columns(2)
-                if col_app.button(f"승인", key=f"app_{uid}"):
+                if col_app.button("승인", key=f"app_{uid}"):
                     current_users[uid]["approved"] = True
                     save_users(current_users)
+                    log_activity(st.session_state["username"], st.session_state["user_name"], "회원 승인", f"승인 대상: {uid}")
                     st.rerun()
-                if col_del.button(f"반려", key=f"del_{uid}"):
+                if col_del.button("반려", key=f"del_{uid}"):
                     del current_users[uid]
                     save_users(current_users)
+                    log_activity(st.session_state["username"], st.session_state["user_name"], "회원 반려", f"반려 대상: {uid}")
                     st.rerun()
         else:
             st.caption("대기 중인 승인 요청이 없습니다.")
 
+    # 회원별 방문 및 활동 감사 로그
+    with st.sidebar.expander("📋 회원 방문/활동 로그", expanded=False):
+        df_logs = load_activity_logs()
+        if not df_logs.empty:
+            st.caption(f"총 누적 로그: {len(df_logs)}건")
+            user_filter = st.selectbox("사용자별 필터", ["전체"] + sorted(df_logs["아이디"].unique().tolist()))
+            if user_filter != "전체":
+                view_logs = df_logs[df_logs["아이디"] == user_filter]
+            else:
+                view_logs = df_logs
+            st.dataframe(view_logs, hide_index=True, width="stretch")
+            
+            if st.button("로그 비우기", type="secondary"):
+                if os.path.exists(LOG_DB_FILE):
+                    os.remove(LOG_DB_FILE)
+                st.rerun()
+        else:
+            st.caption("기록된 활동 로그가 없습니다.")
+
 st.sidebar.markdown("---")
 st.sidebar.write(f"📁 적재 완료 파일: **{len(loaded_files)}건**")
 
-# 대시보드 타이틀
+# 대시보드 메인 헤더
 st.title("📊 월간 미디어·광고 업계 동향 대시보드")
 st.caption("2021년 9월 이후 축적된 월간 동향 보고서를 다각도로 분석·조회하는 통합 인텔리전스 시스템")
 
+# ==========================================
+# 🔍 3. 메인 화면 전 카테고리 실시간 통합 검색 영역
+# ==========================================
+st.markdown("### 🔍 업계 동향 전 카테고리 통합 검색")
+global_query = st.text_input(
+    "키워드를 입력하면 모든 엑셀 데이터(이슈, PT, 매출/매체사)에서 실시간으로 찾아냅니다.",
+    placeholder="예: OTT, 현대, 제일기획, 카카오, 디즈니 등 입력 후 Enter"
+).strip()
+
+if global_query:
+    # A. 이슈 데이터 검색
+    matched_issues = pd.DataFrame()
+    if not df_issues.empty:
+        cond_issue = (
+            df_issues["헤드라인"].str.contains(global_query, case=False, na=False) |
+            df_issues["상세"].str.contains(global_query, case=False, na=False)
+        )
+        matched_issues = df_issues[cond_issue]
+        
+    # B. PT 데이터 검색
+    matched_pt = pd.DataFrame()
+    if not df_pt_unique.empty:
+        cond_pt = (
+            df_pt_unique["광고주"].str.contains(global_query, case=False, na=False) |
+            df_pt_unique["품목"].str.contains(global_query, case=False, na=False) |
+            df_pt_unique["선정사"].str.contains(global_query, case=False, na=False) |
+            df_pt_unique["참여사"].str.contains(global_query, case=False, na=False) |
+            df_pt_unique["기존사"].str.contains(global_query, case=False, na=False) |
+            df_pt_unique["메모"].str.contains(global_query, case=False, na=False)
+        )
+        matched_pt = df_pt_unique[cond_pt]
+        
+    # C. 대행사/방송사 검색
+    matched_agency = pd.DataFrame()
+    if not df_agency.empty:
+        matched_agency = df_agency[df_agency["대행사"].str.contains(global_query, case=False, na=False)]
+        
+    matched_tv = pd.DataFrame()
+    if not df_tv.empty:
+        matched_tv = df_tv[df_tv["채널"].str.contains(global_query, case=False, na=False)]
+
+    # 카테고리별 검색 결과 건수 메트릭
+    tot_cnt = len(matched_issues) + len(matched_pt) + len(matched_agency) + len(matched_tv)
+    st.info(f"🔎 **'{global_query}'** 통합 검색 결과: 총 **{tot_cnt}건** 발견됨")
+    
+    sc1, sc2, sc3, sc4 = st.columns(4)
+    sc1.metric("📰 주요 이슈", f"{len(matched_issues)}건")
+    sc2.metric("🎯 경쟁 PT 현황", f"{len(matched_pt)}건")
+    sc3.metric("🏢 대행사 매출 데이터", f"{len(matched_agency)}건")
+    sc4.metric("📺 방송 매체사 데이터", f"{len(matched_tv)}건")
+    
+    # 검색 결과 상세 나열 Expander
+    if len(matched_issues) > 0:
+        with st.expander(f"📰 주요 이슈 내 검색 결과 ({len(matched_issues)}건)", expanded=True):
+            for _, row in matched_issues.iterrows():
+                headline_text = f"**[{row['연월']}]** {row['헤드라인']}"
+                if row['상세']:
+                    st.markdown(f"- {headline_text}<br>&nbsp;&nbsp;&nbsp;&nbsp;↳ *{row['상세']}*", unsafe_allow_html=True)
+                else:
+                    st.markdown(f"- {headline_text}")
+
+    if len(matched_pt) > 0:
+        with st.expander(f"🎯 PT 수주 현황 내 검색 결과 ({len(matched_pt)}건)", expanded=True):
+            st.dataframe(
+                matched_pt[["발행연월", "PT일자", "광고주", "품목", "빌링_원문", "참여사", "선정사", "메모"]].rename(columns={"빌링_원문": "빌링(억원)"}),
+                hide_index=True,
+                width="stretch"
+            )
+
+    if len(matched_agency) > 0 or len(matched_tv) > 0:
+        with st.expander(f"🏢 대행사 / 매체사 관련 검색 결과 ({len(matched_agency) + len(matched_tv)}건)", expanded=False):
+            if len(matched_agency) > 0:
+                st.caption("🏆 **대행사 매출 데이터**")
+                st.dataframe(matched_agency[["연월", "대행사", "매출(억원)"]], hide_index=True, width="stretch")
+            if len(matched_tv) > 0:
+                st.caption("📺 **방송 매체사 매출 데이터**")
+                st.dataframe(matched_tv[["연월", "구분", "채널", "매출(억원)"]], hide_index=True, width="stretch")
+
+    if tot_cnt == 0:
+        st.warning(f"'{global_query}'에 대한 검색 결과가 업로드된 모든 자료에 없습니다.")
+    
+    st.markdown("---")
+
+# ==========================================
+# 기존 4개 상세 탭 영역
+# ==========================================
 tab1, tab2, tab3, tab4 = st.tabs([
     "🎯 광고회사 PT 수주 현황", 
     "🏢 대행사/매체사 매출 동향", 
@@ -382,9 +591,17 @@ with tab1:
     else:
         st.warning("PT 데이터가 아직 없습니다.")
 
-# 탭 2: 매출 동향 (다중 선택 필터)
+# 탭 2: 매출 동향 (그래프 / 매출표 / 둘 다 보기 옵션 제공)
 with tab2:
     st.subheader("🏢 광고대행사 및 방송 매체사 매출 추이")
+    
+    view_mode = st.radio(
+        "보기 방식 선택",
+        ["📊 그래프 보기", "📋 상세 매출표 보기", "📊+📋 둘 다 보기"],
+        horizontal=True
+    )
+    st.markdown("---")
+    
     col_l, col_r = st.columns(2)
     
     with col_l:
@@ -395,20 +612,33 @@ with tab2:
                 "조회할 대행사 선택",
                 options=all_agencies,
                 default=all_agencies,
+                key="sel_agency",
                 help="비교하고 싶은 대행사만 클릭하거나 검색해 필터링할 수 있습니다."
             )
             filtered_agency = df_agency[df_agency["대행사"].isin(selected_agencies)]
             
             if not filtered_agency.empty:
-                fig_agency = px.bar(
-                    filtered_agency, 
-                    x="대행사", 
-                    y="매출(억원)", 
-                    color="연월", 
-                    barmode="group", 
-                    text_auto=True
-                )
-                st.plotly_chart(fig_agency, width="stretch")
+                if view_mode in ["📊 그래프 보기", "📊+📋 둘 다 보기"]:
+                    fig_agency = px.bar(
+                        filtered_agency, 
+                        x="대행사", 
+                        y="매출(억원)", 
+                        color="연월", 
+                        barmode="group", 
+                        text_auto=True
+                    )
+                    st.plotly_chart(fig_agency, width="stretch")
+                
+                if view_mode in ["📋 상세 매출표 보기", "📊+📋 둘 다 보기"]:
+                    st.caption("📋 **대행사별 월별 매출 집계표 (단위: 억원)**")
+                    pivot_agency = filtered_agency.pivot_table(
+                        index="대행사", 
+                        columns="연월", 
+                        values="매출(억원)", 
+                        aggfunc="sum",
+                        fill_value=0
+                    )
+                    st.dataframe(pivot_agency, width="stretch")
             else:
                 st.warning("선택된 대행사가 없습니다. 위에서 대행사를 선택해 주세요.")
         else:
@@ -423,19 +653,32 @@ with tab2:
                 "조회할 방송 매체/채널 선택",
                 options=all_channels,
                 default=all_channels,
+                key="sel_tv",
                 help="추이를 확인하고 싶은 채널만 필터링할 수 있습니다."
             )
             filtered_tv = tv_source[tv_source["채널"].isin(selected_channels)]
             
             if not filtered_tv.empty:
-                fig_tv = px.line(
-                    filtered_tv, 
-                    x="연월", 
-                    y="매출(억원)", 
-                    color="채널", 
-                    markers=True
-                )
-                st.plotly_chart(fig_tv, width="stretch")
+                if view_mode in ["📊 그래프 보기", "📊+📋 둘 다 보기"]:
+                    fig_tv = px.line(
+                        filtered_tv, 
+                        x="연월", 
+                        y="매출(억원)", 
+                        color="채널", 
+                        markers=True
+                    )
+                    st.plotly_chart(fig_tv, width="stretch")
+                
+                if view_mode in ["📋 상세 매출표 보기", "📊+📋 둘 다 보기"]:
+                    st.caption("📋 **방송사/채널별 월별 매출 집계표 (단위: 억원)**")
+                    pivot_tv = filtered_tv.pivot_table(
+                        index="채널", 
+                        columns="연월", 
+                        values="매출(억원)", 
+                        aggfunc="sum",
+                        fill_value=0
+                    )
+                    st.dataframe(pivot_tv, width="stretch")
             else:
                 st.warning("선택된 매체/채널이 없습니다. 위에서 채널을 선택해 주세요.")
         else:
@@ -463,11 +706,11 @@ with tab4:
     else:
         try:
             genai.configure(api_key=api_key)
-            target_model = "gemini-3.6-flash"
+            target_model = "gemini-2.5-flash"
             model = genai.GenerativeModel(target_model)
             st.caption(f"연결된 AI 모델: `{target_model}`")
             
-            user_question = st.text_input("질문을 입력하세요", placeholder="예: 디즈니플러스 런칭이 유료방송에 미친 영향은?")
+            user_question = st.text_input("질문을 입력하세요", placeholder="예: 최근 주요 광고주 PT 동향을 요약해줘")
             
             if st.button("AI 분석 요청", type="primary") and user_question:
                 with st.spinner("동향 데이터를 분석 중입니다..."):
@@ -493,6 +736,14 @@ with tab4:
 3. 데이터에 없는 내용은 추측하지 마세요.
 """
                     response = model.generate_content(prompt)
+                    
+                    log_activity(
+                        st.session_state["username"], 
+                        st.session_state["user_name"], 
+                        "AI 질의", 
+                        f"질문: {user_question[:40]}..."
+                    )
+                    
                     st.markdown("### 💡 AI 분석 리포트")
                     st.markdown(response.text)
         except Exception as e:
