@@ -850,7 +850,7 @@ with tab4:
     else:
         try:
             genai.configure(api_key=api_key)
-            target_model = "gemini-2.5-flash"
+            target_model = "gemini-3.6-flash"
             model = genai.GenerativeModel(target_model)
             st.caption(f"연결된 AI 모델: `{target_model}`")
             
