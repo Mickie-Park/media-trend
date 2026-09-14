@@ -239,66 +239,87 @@ def load_all_data():
                             "메모": str(memo).strip() if pd.notna(memo) else ""
                         })
 
-            # C. 대행사 전파광고 매출
+            # C. 대행사 전파광고 매출 (전수 수집)
             for i in range(len(df)):
                 row_str = " ".join([str(x) for x in df.iloc[i].dropna().tolist()])
-                if "광고회사 전파광고" in row_str:
-                    for offset in range(3, 40):
+                if "광고회사 전파광고" in row_str or "대행사 전파광고" in row_str:
+                    for offset in range(2, 45):
                         if i + offset >= len(df): break
                         agency_row = df.iloc[i + offset].tolist()
                         name_candidate = str(agency_row[0]).strip() if pd.notna(agency_row[0]) else ""
-                        if any(ag in name_candidate for ag in ["제일기획", "이노션", "대홍기획", "HS AD", "TBWA", "SM C&C", "Dentsu"]):
+                        
+                        # 불필요한 헤더/합계/빈값 제외
+                        if not name_candidate or name_candidate in ["nan", "대행사", "광고회사", "회사명", "구분"]:
+                            continue
+                        if any(x in name_candidate for x in ["전파광고", "매출액", "순위", "합계", "Total", "소계"]):
+                            continue
+                        
+                        # 1번째 또는 2번째 열에서 매출 숫자 추출
+                        val = None
+                        for col_idx in [1, 2]:
+                            if len(agency_row) > col_idx and pd.notna(agency_row[col_idx]):
+                                raw_v = str(agency_row[col_idx]).replace(',', '').replace(' ', '').strip()
+                                try:
+                                    val = float(raw_v)
+                                    break
+                                except:
+                                    pass
+                        
+                        if val is not None and val > 0:
+                            agency_sales_list.append({
+                                "연월": ym,
+                                "연도": year_str,
+                                "월": f"{int(month_str)}월" if month_str.isdigit() else month_str,
+                                "대행사": name_candidate,
+                                "매출(억원)": val
+                            })
+
+            # D. 방송/미디어 매체사 매출 (CJ ENM, 지상파, 종편, 케이블 전수 수집)
+            for i in range(len(df)):
+                row_vals = [str(x) for x in df.iloc[i].dropna().tolist()]
+                row_text = " ".join(row_vals)
+                
+                # 지상파 섹션
+                if "지상파 매출" in row_text or "지상파 광고" in row_text:
+                    for offset in range(1, 15):
+                        if i + offset >= len(df): break
+                        sub_row = df.iloc[i + offset].dropna().tolist()
+                        if len(sub_row) >= 2:
+                            ch_name = str(sub_row[0]).strip()
+                            if not ch_name or any(x in ch_name for x in ["구분", "채널", "매출", "합계", "Total", "소계"]):
+                                continue
                             try:
-                                val = float(str(agency_row[1]).replace(',', '').strip())
-                                agency_sales_list.append({
+                                val = float(str(sub_row[1]).replace(',', '').strip())
+                                tv_sales_list.append({
                                     "연월": ym,
                                     "연도": year_str,
                                     "월": f"{int(month_str)}월" if month_str.isdigit() else month_str,
-                                    "대행사": name_candidate,
-                                    "매출(억원)": val
+                                    "채널": ch_name,
+                                    "매출(억원)": val,
+                                    "구분": "지상파"
                                 })
                             except: pass
 
-            # D. 방송사 매출
-            for i in range(len(df)):
-                row_vals = [str(x) for x in df.iloc[i].dropna().tolist()]
-                if any("지상파 매출" in x for x in row_vals):
-                    for offset in range(1, 10):
+                # 종합/유선/CJ ENM 등 케이블 및 미디어 섹션
+                if any(k in row_text for k in ["종합/유선채널", "유선채널", "케이블", "종편"]):
+                    for offset in range(1, 25):
                         if i + offset >= len(df): break
-                        sub_row = df.iloc[i+offset].dropna().tolist()
-                        if len(sub_row) >= 3:
+                        sub_row = df.iloc[i + offset].dropna().tolist()
+                        if len(sub_row) >= 2:
                             ch_name = str(sub_row[0]).strip()
-                            if any(tv in ch_name for tv in ["KBS", "MBC", "SBS", "Total"]):
-                                try:
-                                    val = float(str(sub_row[1]).replace(',', '').strip())
-                                    tv_sales_list.append({
-                                        "연월": ym,
-                                        "연도": year_str,
-                                        "월": f"{int(month_str)}월" if month_str.isdigit() else month_str,
-                                        "채널": ch_name,
-                                        "매출(억원)": val,
-                                        "구분": "지상파"
-                                    })
-                                except: pass
-
-                if any("종합/유선채널" in x for x in row_vals):
-                    for offset in range(1, 15):
-                        if i + offset >= len(df): break
-                        sub_row = df.iloc[i+offset].dropna().tolist()
-                        if len(sub_row) >= 3:
-                            ch_name = str(sub_row[0]).strip()
-                            if any(tv in ch_name for tv in ["TV Chosun", "MBN", "Channel A", "JTBC", "SBS Plus", "SPOTV"]):
-                                try:
-                                    val = float(str(sub_row[1]).replace(',', '').strip())
-                                    tv_sales_list.append({
-                                        "연월": ym,
-                                        "연도": year_str,
-                                        "월": f"{int(month_str)}월" if month_str.isdigit() else month_str,
-                                        "채널": ch_name,
-                                        "매출(억원)": val,
-                                        "구분": "종편/유선"
-                                    })
-                                except: pass
+                            if not ch_name or any(x in ch_name for x in ["구분", "채널", "매출", "합계", "Total", "소계", "순위"]):
+                                continue
+                            try:
+                                val = float(str(sub_row[1]).replace(',', '').strip())
+                                tv_sales_list.append({
+                                    "연월": ym,
+                                    "연도": year_str,
+                                    "월": f"{int(month_str)}월" if month_str.isdigit() else month_str,
+                                    "채널": ch_name,
+                                    "매출(억원)": val,
+                                    "구분": "종편/유선/PP"
+                                })
+                            except: pass
         except Exception as e:
             st.error(f"{f} 파싱 오류: {e}")
             
