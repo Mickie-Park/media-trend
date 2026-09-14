@@ -24,10 +24,10 @@ GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", None)
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "Mickie-Park/media-trend")
 FILE_PATH = "users.json"
 
-# --- 2. 슬레이트-네이비 엔터프라이즈 테마 CSS 주입 ---
+# --- 2. 슬레이트-네이비 엔터프라이즈 테마 CSS (사이드바 버튼 가독성 보정) ---
 st.markdown("""
 <style>
-    /* 1. 프리텐다드 폰트 로드 및 전체 기본 폰트 적용 */
+    /* 1. 프리텐다드 폰트 */
     @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
     
     html, body, [class*="css"], .stMarkdown, .stText, .stButton, .stTextInput, .stSelectbox {
@@ -35,18 +35,20 @@ st.markdown("""
         letter-spacing: -0.015em;
     }
 
-    /* 2. 전체 캔버스 배경 및 기본 텍스트 */
+    /* 2. 메인 캔버스 */
     .stApp {
         background-color: #F8FAFC;
         color: #1E293B;
     }
 
-    /* 3. 사이드바 스타일 (딥 슬레이트 네이비) */
+    /* 3. 사이드바 베이스 */
     [data-testid="stSidebar"] {
         background-color: #0F172A;
         border-right: 1px solid #1E293B;
     }
-    [data-testid="stSidebar"] * {
+    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, 
+    [data-testid="stSidebar"] h4, [data-testid="stSidebar"] p, [data-testid="stSidebar"] span,
+    [data-testid="stSidebar"] label {
         color: #F1F5F9 !important;
     }
     [data-testid="stSidebar"] hr {
@@ -56,7 +58,68 @@ st.markdown("""
         color: #94A3B8 !important;
     }
 
-    /* 4. 지표(Metric) 카드 정돈 */
+    /* 4. [핵심] 사이드바 버튼 가독성/대비 완전 분리 */
+    /* A. 사이드바 일반 버튼 (Secondary) */
+    [data-testid="stSidebar"] button[kind="secondary"] {
+        background-color: #1E293B !important;
+        border: 1px solid #475569 !important;
+        border-radius: 6px !important;
+    }
+    [data-testid="stSidebar"] button[kind="secondary"] * {
+        color: #F8FAFC !important;
+        font-weight: 600 !important;
+    }
+    [data-testid="stSidebar"] button[kind="secondary"]:hover {
+        background-color: #334155 !important;
+        border-color: #64748B !important;
+    }
+
+    /* B. 사이드바 강조 버튼 (Primary) */
+    [data-testid="stSidebar"] button[kind="primary"] {
+        background-color: #2563EB !important;
+        border: 1px solid #3B82F6 !important;
+        border-radius: 6px !important;
+    }
+    [data-testid="stSidebar"] button[kind="primary"] * {
+        color: #FFFFFF !important;
+        font-weight: 700 !important;
+    }
+    [data-testid="stSidebar"] button[kind="primary"]:hover {
+        background-color: #1D4ED8 !important;
+        border-color: #2563EB !important;
+    }
+
+    /* 5. 사이드바 내부 아코디언(Expander) 및 인풋 배경 정리 */
+    [data-testid="stSidebar"] [data-testid="stExpander"] {
+        background-color: #1E293B !important;
+        border: 1px solid #334155 !important;
+        border-radius: 6px !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stExpander"] * {
+        color: #F1F5F9 !important;
+    }
+    [data-testid="stSidebar"] input {
+        background-color: #0F172A !important;
+        border: 1px solid #475569 !important;
+        color: #FFFFFF !important;
+    }
+
+    /* 6. 메인 본문 영역 버튼 스타일 */
+    .stApp > div:not([data-testid="stSidebar"]) button[kind="primary"] {
+        background-color: #1E3A8A !important;
+        border-color: #1E3A8A !important;
+        color: #FFFFFF !important;
+        border-radius: 6px !important;
+        font-weight: 600 !important;
+    }
+    .stApp > div:not([data-testid="stSidebar"]) button[kind="secondary"] {
+        background-color: #FFFFFF !important;
+        border: 1px solid #CBD5E1 !important;
+        color: #334155 !important;
+        border-radius: 6px !important;
+    }
+
+    /* 7. 지표(Metric) 카드 정돈 */
     [data-testid="stMetric"] {
         background-color: #FFFFFF;
         padding: 16px 20px;
@@ -76,7 +139,7 @@ st.markdown("""
         letter-spacing: -0.02em;
     }
 
-    /* 5. 탭(Tab) 커스텀 */
+    /* 8. 탭(Tab) 커스텀 */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
         border-bottom: 2px solid #E2E8F0;
@@ -96,39 +159,14 @@ st.markdown("""
         background-color: transparent !important;
     }
 
-    /* 6. 버튼 스타일 */
-    button[kind="primary"] {
-        background-color: #1E3A8A !important;
-        border-color: #1E3A8A !important;
-        color: #FFFFFF !important;
-        border-radius: 6px !important;
-        font-weight: 600 !important;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-    }
-    button[kind="primary"]:hover {
-        background-color: #172554 !important;
-        border-color: #172554 !important;
-    }
-    button[kind="secondary"] {
-        background-color: #FFFFFF !important;
-        border: 1px solid #CBD5E1 !important;
-        color: #334155 !important;
-        border-radius: 6px !important;
-    }
-    button[kind="secondary"]:hover {
-        background-color: #F1F5F9 !important;
-        border-color: #94A3B8 !important;
-    }
-
-    /* 7. 아코디언(Expander) 및 인풋 테두리 */
-    [data-testid="stExpander"] {
+    /* 9. 본문 아코디언 및 셀렉트박스 */
+    .stApp > div:not([data-testid="stSidebar"]) [data-testid="stExpander"] {
         background-color: #FFFFFF;
         border: 1px solid #E2E8F0 !important;
         border-radius: 8px !important;
         margin-bottom: 12px;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
     }
-    div[data-baseweb="select"] > div, .stTextInput input {
+    div[data-baseweb="select"] > div, .stApp > div:not([data-testid="stSidebar"]) .stTextInput input {
         border-color: #CBD5E1 !important;
         border-radius: 6px !important;
         background-color: #FFFFFF !important;
