@@ -1,7 +1,7 @@
 {
     "admin": {
         "name": "마스터 관리자",
-        "password": "346d26cc3635e78c0eff489f9f19dee59628d24fdde847ff92b0c39a18d0a096",
+        "password": "ac9689e2272427085e35b9d3e3e8bed88cb3434828b43b86fc0596cad4c6e270",
         "role": "admin",
         "approved": true
     }
