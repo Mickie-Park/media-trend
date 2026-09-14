@@ -19,7 +19,7 @@ USER_DB_FILE = "users.json"
 LOG_DB_FILE = "activity_logs.json"
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# GitHub API 연동 설정 (media-trend로 통일)
+# GitHub API 연동 설정 (media-trend)
 GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", None)
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "Mickie-Park/media-trend")
 FILE_PATH = "users.json"
@@ -39,7 +39,7 @@ def get_now_kst():
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
-# 승인 여부 판별 헬퍼 (다양한 데이터 타입 대응)
+# 승인 여부 판별 헬퍼
 def is_user_approved(val):
     if isinstance(val, bool):
         return val
@@ -49,7 +49,7 @@ def is_user_approved(val):
         return val == 1
     return False
 
-# 회원 DB 로드 (GitHub API 연동 및 안전 Fallback)
+# 회원 DB 로드 (GitHub API 연동 및 로컬 Fallback)
 def load_users():
     default_admin = {
         "admin": {
@@ -465,17 +465,8 @@ if not st.session_state["logged_in"]:
                 if login_id in users_current:
                     user_info = users_current[login_id]
                     
-                    # [핵심 안전핀] 비밀번호 일치 또는 마스터 admin 계정의 admin1234 입력 시 무조건 강제 통과
-                    is_valid_pw = (user_info["password"] == hash_password(login_pw)) or (login_id == "admin" and login_pw == "admin1234")
-                    
-                    if is_valid_pw:
-                        # 로컬이나 GitHub에 잘못된 해시가 있다면 정상 admin1234 해시로 자동 갱신 복구
-                        if login_id == "admin":
-                            user_info["password"] = hash_password("admin1234")
-                            user_info["approved"] = True
-                            users_current["admin"] = user_info
-                            save_users(users_current)
-
+                    # [정상 인증 로직] 입력한 비밀번호 해시가 일치할 때만 정상 통과
+                    if user_info["password"] == hash_password(login_pw):
                         if is_user_approved(user_info.get("approved", False)):
                             st.session_state["logged_in"] = True
                             st.session_state["username"] = login_id
@@ -572,11 +563,9 @@ with st.sidebar.expander("👤 내 정보 관리", expanded=False):
         save_profile_btn = st.form_submit_button("정보 저장")
         
         if save_profile_btn:
-            # 마스터 admin의 경우 초기 복구 배려
-            is_cur_match = (hash_password(curr_pw_input) == my_info.get("password")) or (curr_user_id == "admin" and curr_pw_input == "admin1234")
             if not curr_pw_input:
                 st.error("현재 비밀번호를 입력해야 수정할 수 있습니다.")
-            elif not is_cur_match:
+            elif hash_password(curr_pw_input) != my_info.get("password"):
                 st.error("현재 비밀번호가 일치하지 않습니다.")
             else:
                 if new_pw_input:
