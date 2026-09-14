@@ -4,5 +4,11 @@
         "password": "346d26cc3635e78c0eff489f9f19dee59628d24fdde847ff92b0c39a18d0a096",
         "role": "admin",
         "approved": true
+    },
+    "cjs9134": {
+        "name": "최종석",
+        "password": "beb899c67247b2d56121ce75b74da22bdf262865c51343d84bc51dbe10dc507e",
+        "role": "member",
+        "approved": false
     }
 }
