@@ -26,81 +26,91 @@ def get_now_kst():
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
-# 회원 DB 로드 및 저장
+# 회원 DB 로드 및 저장 (GitHub API 영구 보존 동기화)
+import base64
+import requests
+
+GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", None)
+GITHUB_REPO = st.secrets.get("GITHUB_REPO", "Mickie-Park/media-trend")
+FILE_PATH = "users.json"
+
+def get_github_headers():
+    return {
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+
 def load_users():
-    if not os.path.exists(USER_DB_FILE):
-        default_users = {
-            "admin": {
-                "name": "마스터 관리자",
-                "password": hash_password("admin1234"),
-                "role": "admin",
-                "approved": True
+    if not GITHUB_TOKEN:
+        if not os.path.exists(USER_DB_FILE):
+            default_users = {
+                "admin": {
+                    "name": "마스터 관리자",
+                    "password": hash_password("admin1234"),
+                    "role": "admin",
+                    "approved": True
+                }
             }
-        }
-        with open(USER_DB_FILE, "w", encoding="utf-8") as f:
-            json.dump(default_users, f, ensure_ascii=False, indent=4)
-        return default_users
+            with open(USER_DB_FILE, "w", encoding="utf-8") as f:
+                json.dump(default_users, f, ensure_ascii=False, indent=4)
+            return default_users
+        try:
+            with open(USER_DB_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+            
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{FILE_PATH}"
     try:
-        with open(USER_DB_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+        res = requests.get(url, headers=get_github_headers())
+        if res.status_code == 200:
+            content = res.json()["content"]
+            decoded = base64.b64decode(content).decode("utf-8")
+            users = json.loads(decoded)
+            with open(USER_DB_FILE, "w", encoding="utf-8") as f:
+                json.dump(users, f, ensure_ascii=False, indent=4)
+            return users
+        elif res.status_code == 404:
+            default_users = {
+                "admin": {
+                    "name": "마스터 관리자",
+                    "password": hash_password("admin1234"),
+                    "role": "admin",
+                    "approved": True
+                }
+            }
+            save_users(default_users)
+            return default_users
     except Exception:
-        return {}
+        pass
+    return {}
 
 def save_users(users_dict):
     with open(USER_DB_FILE, "w", encoding="utf-8") as f:
         json.dump(users_dict, f, ensure_ascii=False, indent=4)
-
-# 활동 로그 기록 함수 (최근 1,000건 보관)
-def log_activity(username, user_name, action, details=""):
-    now = get_now_kst()
-    timestamp_str = now.strftime("%Y-%m-%d %H:%M:%S")
-    
-    logs = []
-    if os.path.exists(LOG_DB_FILE):
-        try:
-            with open(LOG_DB_FILE, "r", encoding="utf-8") as f:
-                logs = json.load(f)
-        except Exception:
-            logs = []
-            
-    logs.append({
-        "timestamp": timestamp_str,
-        "username": username,
-        "name": user_name,
-        "action": action,
-        "details": details
-    })
-    
-    if len(logs) > 1000:
-        logs = logs[-1000:]
         
+    if not GITHUB_TOKEN:
+        return
+
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{FILE_PATH}"
+    headers = get_github_headers()
     try:
-        with open(LOG_DB_FILE, "w", encoding="utf-8") as f:
-            json.dump(logs, f, ensure_ascii=False, indent=4)
+        res = requests.get(url, headers=headers)
+        sha = res.json().get("sha") if res.status_code == 200 else None
+        
+        raw_content = json.dumps(users_dict, ensure_ascii=False, indent=4)
+        b64_content = base64.b64encode(raw_content.encode("utf-8")).decode("utf-8")
+        
+        payload = {
+            "message": "Update users database via Streamlit",
+            "content": b64_content
+        }
+        if sha:
+            payload["sha"] = sha
+            
+        requests.put(url, headers=headers, json=payload)
     except Exception:
         pass
-
-def load_activity_logs():
-    if not os.path.exists(LOG_DB_FILE):
-        return pd.DataFrame(columns=["일시", "아이디", "이름", "활동 구분", "상세 내역"])
-    try:
-        with open(LOG_DB_FILE, "r", encoding="utf-8") as f:
-            logs = json.load(f)
-        df_l = pd.DataFrame(logs)
-        if not df_l.empty:
-            df_l = df_l.rename(columns={
-                "timestamp": "일시",
-                "username": "아이디",
-                "name": "이름",
-                "action": "활동 구분",
-                "details": "상세 내역"
-            })
-            return df_l.sort_values(by="일시", ascending=False)
-        return pd.DataFrame(columns=["일시", "아이디", "이름", "활동 구분", "상세 내역"])
-    except Exception:
-        return pd.DataFrame(columns=["일시", "아이디", "이름", "활동 구분", "상세 내역"])
-
-users_db = load_users()
 
 # --- 세션 상태 초기화 및 새로고침(F5) 유지 처리 ---
 if "logged_in" not in st.session_state:
