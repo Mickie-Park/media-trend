@@ -39,6 +39,16 @@ def get_now_kst():
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
+# 승인 여부 판별 헬퍼 (다양한 데이터 타입 대응)
+def is_user_approved(val):
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, str):
+        return val.strip().lower() in ["true", "1", "t", "y", "yes"]
+    if isinstance(val, (int, float)):
+        return val == 1
+    return False
+
 # 회원 DB 로드 (GitHub API 연동 및 안전 Fallback)
 def load_users():
     default_admin = {
@@ -106,7 +116,7 @@ def save_users(users_dict):
     except Exception:
         pass
 
-# 활동 로그 기록 함수 (최근 1,000건 보관)
+# 활동 로그 기록 함수
 def log_activity(username, user_name, action, details=""):
     now = get_now_kst()
     timestamp_str = now.strftime("%Y-%m-%d %H:%M:%S")
@@ -172,14 +182,14 @@ if "logged_in" not in st.session_state:
 auth_token = st.query_params.get("user", None)
 if auth_token and not st.session_state["logged_in"]:
     users_current = load_users()
-    if auth_token in users_current and users_current[auth_token].get("approved", False):
+    if auth_token in users_current and is_user_approved(users_current[auth_token].get("approved", False)):
         st.session_state["logged_in"] = True
         st.session_state["username"] = auth_token
         st.session_state["role"] = users_current[auth_token].get("role", "member")
         st.session_state["user_name"] = users_current[auth_token].get("name", auth_token)
         st.session_state["login_time"] = get_now_kst()
 
-# --- 2. 엑셀 데이터 파싱 함수 (매체사 표준화 및 문법 구조 완전 복구) ---
+# --- 2. 엑셀 데이터 파싱 함수 ---
 @st.cache_data
 def load_all_data():
     raw_files = glob.glob("**/*.[xX][lL][sS][xX]", recursive=True)
@@ -198,7 +208,6 @@ def load_all_data():
     pt_list = []
     agency_sales_list = []
     
-    # 공인 방송/매체사 키워드 표준화 사전
     KNOWN_MEDIA_DICT = {
         "KBS": "KBS",
         "MBC": "MBC",
@@ -362,7 +371,7 @@ def load_all_data():
                                 "매출(억원)": sales_val
                             })
 
-            # D. 방송/미디어 매체사 매출 (전수 표준화 매핑)
+            # D. 방송/미디어 매체사 매출
             for i in range(len(df)):
                 row_vals = [str(x).strip() for x in df.iloc[i].dropna().tolist()]
                 row_text = " ".join(row_vals).upper()
@@ -443,7 +452,7 @@ if not st.session_state["logged_in"]:
                 if login_id in users_current:
                     user_info = users_current[login_id]
                     if user_info["password"] == hash_password(login_pw):
-                        if user_info.get("approved", False):
+                        if is_user_approved(user_info.get("approved", False)):
                             st.session_state["logged_in"] = True
                             st.session_state["username"] = login_id
                             st.session_state["role"] = user_info.get("role", "member")
@@ -589,6 +598,27 @@ if st.session_state["role"] == "admin":
             st.session_state["admin_view"] = False
             st.rerun()
             
+    # 사이드바 빠른 승인 창 (누락 방지)
+    current_users_sb = load_users()
+    pending_sb = {uid: info for uid, info in current_users_sb.items() if not is_user_approved(info.get("approved", False))}
+    with st.sidebar.expander(f"⚡ 빠른 회원 승인 ({len(pending_sb)}건 대기)", expanded=bool(pending_sb)):
+        if pending_sb:
+            for uid, info in pending_sb.items():
+                st.write(f"**{info.get('name', uid)}** (`{uid}`)")
+                sc_btn1, sc_btn2 = st.columns(2)
+                if sc_btn1.button("승인", key=f"sb_app_{uid}", type="primary"):
+                    current_users_sb[uid]["approved"] = True
+                    save_users(current_users_sb)
+                    log_activity(st.session_state["username"], st.session_state["user_name"], "회원 승인", f"승인: {uid}")
+                    st.rerun()
+                if sc_btn2.button("반려", key=f"sb_del_{uid}"):
+                    del current_users_sb[uid]
+                    save_users(current_users_sb)
+                    log_activity(st.session_state["username"], st.session_state["user_name"], "회원 반려", f"반려: {uid}")
+                    st.rerun()
+        else:
+            st.caption("현재 승인 대기자가 없습니다.")
+
     # 신규 엑셀 업로드
     new_file = st.sidebar.file_uploader("월간 엑셀 추가 (.xlsx)", type=["xlsx"])
     if new_file is not None:
@@ -621,70 +651,93 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
     
     admin_tab1, admin_tab2 = st.tabs(["📋 가입 회원 리스트 및 승인 관리", "🔍 회원 방문 및 활동 감사 로그"])
     
+    # 탭 A: 가입 회원 리스트
     with admin_tab1:
         all_users = load_users()
-        user_list_data = []
-        pending_count = 0
+        pending_users_dict = {uid: info for uid, info in all_users.items() if not is_user_approved(info.get("approved", False))}
         
-        for u_id, info in all_users.items():
-            is_app = info.get("approved", False)
-            if not is_app:
-                pending_count += 1
-            user_list_data.append({
-                "아이디": u_id,
-                "이름": info.get("name", u_id),
-                "권한": "관리자(admin)" if info.get("role") == "admin" else "일반회원(member)",
-                "승인상태": "✅ 승인 완료" if is_app else "⏳ 승인 대기"
-            })
-            
-        df_user_summary = pd.DataFrame(user_list_data)
-        
+        # 1. 상단 통계 카드
         u_m1, u_m2, u_m3 = st.columns(3)
-        u_m1.metric("총 등록 계정", f"{len(df_user_summary)}명")
-        u_m2.metric("정상 승인 회원", f"{len(df_user_summary) - pending_count}명")
-        u_m3.metric("승인 대기 중", f"{pending_count}명")
+        u_m1.metric("총 등록 계정", f"{len(all_users)}명")
+        u_m2.metric("정상 승인 회원", f"{len(all_users) - len(pending_users_dict)}명")
+        u_m3.metric("승인 대기 중", f"{len(pending_users_dict)}명")
         
         st.markdown("---")
         
-        pending_users_dict = {uid: info for uid, info in all_users.items() if not info.get("approved", False)}
+        # 2. 신규 가입 승인 대기 섹션 (항상 영역 노출)
+        st.subheader("⏳ 가입 신청 승인 대기 관리")
         if pending_users_dict:
-            st.subheader(f"⏳ 신규 승인 대기 목록 ({len(pending_users_dict)}명)")
-            for uid, info in pending_users_dict.items():
-                p_col1, p_col2, p_col3 = st.columns([3, 1, 1])
-                with p_col1:
-                    st.markdown(f"👤 **{info.get('name', uid)}** (아이디: `{uid}`)")
-                with p_col2:
-                    if st.button("승인하기", key=f"p_app_{uid}", type="primary"):
-                        all_users[uid]["approved"] = True
-                        save_users(all_users)
-                        log_activity(st.session_state["username"], st.session_state["user_name"], "회원 승인", f"승인: {uid}")
-                        st.success(f"{uid} 회원 승인 완료")
-                        st.rerun()
-                with p_col3:
-                    if st.button("반려/삭제", key=f"p_del_{uid}"):
-                        del all_users[uid]
-                        save_users(all_users)
-                        log_activity(st.session_state["username"], st.session_state["user_name"], "회원 반려", f"반려: {uid}")
-                        st.warning(f"{uid} 회원 신청 반려됨")
-                        st.rerun()
-            st.markdown("---")
-            
-        st.subheader("👥 전체 가입 회원 목록")
-        st.dataframe(df_user_summary, use_container_width=True, hide_index=True)
-        
-        with st.expander("⚠️ 회원 계정 강제 탈퇴 / 삭제 관리"):
-            delete_target = st.selectbox(
-                "삭제할 회원 아이디 선택", 
-                [uid for uid in all_users.keys() if uid != "admin" and uid != st.session_state["username"]]
-            )
-            if st.button(f"'{delete_target}' 계정 영구 삭제", type="secondary"):
-                if delete_target in all_users:
-                    del all_users[delete_target]
-                    save_users(all_users)
-                    log_activity(st.session_state["username"], st.session_state["user_name"], "회원 삭제", f"삭제 대상: {delete_target}")
-                    st.success(f"'{delete_target}' 회원이 성공적으로 삭제되었습니다.")
-                    st.rerun()
+            st.info(f"현재 총 **{len(pending_users_dict)}명**의 승인 대기자가 있습니다. 각 회원의 승인 또는 반려 버튼을 눌러주세요.")
+            for uid, info in list(pending_users_dict.items()):
+                with st.container():
+                    p_col1, p_col2, p_col3 = st.columns([3, 1, 1])
+                    with p_col1:
+                        st.markdown(f"👤 이름: **{info.get('name', uid)}** &nbsp;|&nbsp; 아이디: `{uid}` &nbsp;|&nbsp; 권한: `{info.get('role', 'member')}`")
+                    with p_col2:
+                        if st.button("✅ 승인하기", key=f"p_app_btn_{uid}", type="primary", use_container_width=True):
+                            all_users[uid]["approved"] = True
+                            save_users(all_users)
+                            log_activity(st.session_state["username"], st.session_state["user_name"], "회원 승인", f"승인: {uid}")
+                            st.success(f"{info.get('name', uid)}({uid}) 회원 승인 완료")
+                            st.rerun()
+                    with p_col3:
+                        if st.button("❌ 반려/삭제", key=f"p_del_btn_{uid}", use_container_width=True):
+                            del all_users[uid]
+                            save_users(all_users)
+                            log_activity(st.session_state["username"], st.session_state["user_name"], "회원 반려", f"반려: {uid}")
+                            st.warning(f"{info.get('name', uid)}({uid}) 신청 반려됨")
+                            st.rerun()
+                    st.write("")
+        else:
+            st.success("🎉 현재 승인 대기 중인 가입 신청이 없습니다. 모든 회원이 정상 승인 상태입니다.")
 
+        st.markdown("---")
+        
+        # 3. 전체 가입 회원 목록 & 즉각 제어 테이블
+        st.subheader("👥 전체 가입 회원 목록 및 상태 제어")
+        
+        # 목록 헤더
+        h_col1, h_col2, h_col3, h_col4, h_col5 = st.columns([1.5, 1.5, 1.5, 1.5, 2])
+        h_col1.markdown("**아이디**")
+        h_col2.markdown("**이름**")
+        h_col3.markdown("**권한**")
+        h_col4.markdown("**상태**")
+        h_col5.markdown("**관리 조작**")
+        st.markdown("<hr style='margin: 0.5rem 0;'>", unsafe_allow_html=True)
+
+        for u_id, info in list(all_users.items()):
+            r_col1, r_col2, r_col3, r_col4, r_col5 = st.columns([1.5, 1.5, 1.5, 1.5, 2])
+            is_app = is_user_approved(info.get("approved", False))
+            
+            r_col1.write(f"`{u_id}`")
+            r_col2.write(info.get("name", u_id))
+            r_col3.write("관리자(admin)" if info.get("role") == "admin" else "일반회원(member)")
+            r_col4.write("🟢 승인됨" if is_app else "🟡 대기중")
+            
+            with r_col5:
+                btn_c1, btn_c2 = st.columns(2)
+                if not is_app:
+                    if btn_c1.button("승인", key=f"grid_app_{u_id}", type="primary"):
+                        all_users[u_id]["approved"] = True
+                        save_users(all_users)
+                        log_activity(st.session_state["username"], st.session_state["user_name"], "회원 승인", f"승인: {u_id}")
+                        st.rerun()
+                else:
+                    if u_id != "admin" and u_id != st.session_state["username"]:
+                        if btn_c1.button("대기전환", key=f"grid_unapp_{u_id}"):
+                            all_users[u_id]["approved"] = False
+                            save_users(all_users)
+                            log_activity(st.session_state["username"], st.session_state["user_name"], "승인 취소", f"대기 전환: {u_id}")
+                            st.rerun()
+                            
+                if u_id != "admin" and u_id != st.session_state["username"]:
+                    if btn_c2.button("삭제", key=f"grid_del_{u_id}"):
+                        del all_users[u_id]
+                        save_users(all_users)
+                        log_activity(st.session_state["username"], st.session_state["user_name"], "회원 삭제", f"삭제: {u_id}")
+                        st.rerun()
+
+    # 탭 B: 회원 활동 감사 로그
     with admin_tab2:
         st.subheader("🔍 회원 방문 및 활동 실시간 로그")
         df_logs = load_activity_logs()
