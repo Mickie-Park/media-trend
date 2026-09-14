@@ -183,6 +183,41 @@ def load_all_data():
                     memo = row_vals[7] if len(row_vals) > 7 else ""
                     
                     if pd.notna(client) and str(client).strip() != "광고주":
+                        if pd.notna(client) and str(client).strip() != "광고주":
+                        client_str = str(client).strip()
+                        date_raw_str = str(pt_date).strip() if pd.notna(pt_date) else ""
+
+                        # 1. PT일자 칸 또는 광고주 칸에 대행사명/구분선 텍스트가 들어간 경우 제외
+                        excluded_agencies = [
+                            "TBWA", "SM C&C", "HS AD", "차이커뮤니케이션", 
+                            "제일기획", "이노션", "대홍기획", "Dentsu", "덴츠"
+                        ]
+                        if any(ag in date_raw_str for ag in excluded_agencies) or any(ag == client_str for ag in excluded_agencies):
+                            continue
+
+                        # 2. '광고회사 PT' 관련 소제목이나 요약 텍스트 행 제외
+                        if "광고회사" in client_str or "종합편" in client_str:
+                            continue
+
+                        date_str = pt_date.strftime("%Y-%m-%d") if isinstance(pt_date, pd.Timestamp) else date_raw_str
+                        billing_val = 0.0
+                        b_match = re.search(r'(\d+)', str(billing))
+                        if b_match:
+                            try: billing_val = float(b_match.group(1))
+                            except: pass
+                            
+                        pt_list.append({
+                            "발행연월": ym,
+                            "PT일자": date_str,
+                            "광고주": client_str,
+                            "품목": str(product).strip() if pd.notna(product) else "",
+                            "빌링(억원)": billing_val,
+                            "빌링_원문": str(billing).strip() if pd.notna(billing) else "",
+                            "참여사": str(participants).strip() if pd.notna(participants) else "",
+                            "기존사": str(incumbent).strip() if pd.notna(incumbent) else "",
+                            "선정사": str(winner).strip() if pd.notna(winner) else "",
+                            "메모": str(memo).strip() if pd.notna(memo) else ""
+                        })
                         date_str = pt_date.strftime("%Y-%m-%d") if isinstance(pt_date, pd.Timestamp) else (str(pt_date).strip() if pd.notna(pt_date) else "")
                         billing_val = 0.0
                         b_match = re.search(r'(\d+)', str(billing))
