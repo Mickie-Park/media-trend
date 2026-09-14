@@ -12,7 +12,7 @@ import plotly.express as px
 import google.generativeai as genai
 
 # --- 1. 기본 설정 및 데이터 디렉토리 ---
-st.set_page_config(page_title="월간 업계 동향 통합 인텔리전스", layout="wide", page_icon="📊")
+st.set_page_config(page_title="월간 업계 동향 통합 인텔리전스", layout="wide", page_icon="📈")
 
 DATA_DIR = "./data"
 USER_DB_FILE = "users.json"
@@ -24,22 +24,131 @@ GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", None)
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "Mickie-Park/media-trend")
 FILE_PATH = "users.json"
 
+# --- 2. 슬레이트-네이비 엔터프라이즈 테마 CSS 주입 ---
+st.markdown("""
+<style>
+    /* 1. 프리텐다드 폰트 로드 및 전체 기본 폰트 적용 */
+    @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
+    
+    html, body, [class*="css"], .stMarkdown, .stText, .stButton, .stTextInput, .stSelectbox {
+        font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif !important;
+        letter-spacing: -0.015em;
+    }
+
+    /* 2. 전체 캔버스 배경 및 기본 텍스트 */
+    .stApp {
+        background-color: #F8FAFC;
+        color: #1E293B;
+    }
+
+    /* 3. 사이드바 스타일 (딥 슬레이트 네이비) */
+    [data-testid="stSidebar"] {
+        background-color: #0F172A;
+        border-right: 1px solid #1E293B;
+    }
+    [data-testid="stSidebar"] * {
+        color: #F1F5F9 !important;
+    }
+    [data-testid="stSidebar"] hr {
+        border-color: #334155 !important;
+    }
+    [data-testid="stSidebar"] .stCaption {
+        color: #94A3B8 !important;
+    }
+
+    /* 4. 지표(Metric) 카드 정돈 */
+    [data-testid="stMetric"] {
+        background-color: #FFFFFF;
+        padding: 16px 20px;
+        border-radius: 8px;
+        border: 1px solid #E2E8F0;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    }
+    [data-testid="stMetricLabel"] {
+        font-size: 0.82rem !important;
+        font-weight: 500 !important;
+        color: #64748B !important;
+    }
+    [data-testid="stMetricValue"] {
+        font-size: 1.55rem !important;
+        font-weight: 700 !important;
+        color: #0F172A !important;
+        letter-spacing: -0.02em;
+    }
+
+    /* 5. 탭(Tab) 커스텀 */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        border-bottom: 2px solid #E2E8F0;
+        background-color: transparent;
+    }
+    .stTabs [data-baseweb="tab"] {
+        height: 46px;
+        font-size: 0.92rem;
+        font-weight: 600;
+        color: #64748B;
+        border-radius: 6px 6px 0 0;
+        padding: 0 16px;
+    }
+    .stTabs [aria-selected="true"] {
+        color: #1E3A8A !important;
+        border-bottom: 2px solid #1E3A8A !important;
+        background-color: transparent !important;
+    }
+
+    /* 6. 버튼 스타일 */
+    button[kind="primary"] {
+        background-color: #1E3A8A !important;
+        border-color: #1E3A8A !important;
+        color: #FFFFFF !important;
+        border-radius: 6px !important;
+        font-weight: 600 !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+    button[kind="primary"]:hover {
+        background-color: #172554 !important;
+        border-color: #172554 !important;
+    }
+    button[kind="secondary"] {
+        background-color: #FFFFFF !important;
+        border: 1px solid #CBD5E1 !important;
+        color: #334155 !important;
+        border-radius: 6px !important;
+    }
+    button[kind="secondary"]:hover {
+        background-color: #F1F5F9 !important;
+        border-color: #94A3B8 !important;
+    }
+
+    /* 7. 아코디언(Expander) 및 인풋 테두리 */
+    [data-testid="stExpander"] {
+        background-color: #FFFFFF;
+        border: 1px solid #E2E8F0 !important;
+        border-radius: 8px !important;
+        margin-bottom: 12px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+    }
+    div[data-baseweb="select"] > div, .stTextInput input {
+        border-color: #CBD5E1 !important;
+        border-radius: 6px !important;
+        background-color: #FFFFFF !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 def get_github_headers():
     return {
         "Authorization": f"Bearer {GITHUB_TOKEN}",
         "Accept": "application/vnd.github.v3+json"
     }
 
-# 한국 표준시(KST) 구하기
 def get_now_kst():
     kst = timezone(timedelta(hours=9))
     return datetime.now(kst)
 
-# 비밀번호 암호화 함수
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
-# 승인 여부 판별 헬퍼
 def is_user_approved(val):
     if isinstance(val, bool):
         return val
@@ -49,7 +158,7 @@ def is_user_approved(val):
         return val == 1
     return False
 
-# 회원 DB 로드 (GitHub API 연동 및 로컬 Fallback)
+# 회원 DB 로드
 def load_users():
     default_admin = {
         "admin": {
@@ -88,7 +197,7 @@ def load_users():
     save_users(default_admin)
     return default_admin
 
-# 회원 DB 저장 (GitHub API 동기화 및 원인 진단)
+# 회원 DB 저장
 def save_users(users_dict):
     with open(USER_DB_FILE, "w", encoding="utf-8") as f:
         json.dump(users_dict, f, ensure_ascii=False, indent=4)
@@ -159,7 +268,6 @@ def log_activity(username, user_name, action, details=""):
     except Exception:
         pass
 
-# 활동 로그 불러오기 함수
 def load_activity_logs():
     if not os.path.exists(LOG_DB_FILE):
         return pd.DataFrame(columns=["일시", "아이디", "이름", "활동 구분", "상세 내역"])
@@ -191,7 +299,6 @@ if "logged_in" not in st.session_state:
     st.session_state["login_time"] = None
     st.session_state["admin_view"] = False
 
-# URL 파라미터 기반 F5 새로고침 로그인 복원
 auth_token = st.query_params.get("user", None)
 if auth_token and not st.session_state["logged_in"]:
     users_current = load_users()
@@ -202,7 +309,7 @@ if auth_token and not st.session_state["logged_in"]:
         st.session_state["user_name"] = users_current[auth_token].get("name", auth_token)
         st.session_state["login_time"] = get_now_kst()
 
-# --- 2. 엑셀 데이터 파싱 함수 ---
+# --- 3. 엑셀 데이터 파싱 함수 ---
 @st.cache_data
 def load_all_data():
     raw_files = glob.glob("**/*.[xX][lL][sS][xX]", recursive=True)
@@ -446,13 +553,17 @@ def load_all_data():
             
     return pd.DataFrame(issues_list), pd.DataFrame(tv_sales_list), pd.DataFrame(pt_list), pd.DataFrame(agency_sales_list), all_files
 
-# --- 3. 로그인 및 회원가입 화면 ---
+# --- 4. 로그인 및 회원가입 화면 ---
 if not st.session_state["logged_in"]:
-    st.title("🔒 월간 미디어·광고 동향 대시보드")
-    st.caption("사내 인가된 사용자 전용 시스템입니다. 회원가입 후 관리자 승인을 거쳐 접속할 수 있습니다.")
-    st.markdown("---")
+    st.markdown("""
+    <div style="padding: 20px 0 24px 0; border-bottom: 1px solid #E2E8F0; margin-bottom: 24px;">
+        <span style="font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; color: #2563EB; background: #EFF6FF; padding: 3px 8px; border-radius: 4px; border: 1px solid #DBEAFE;">SECURITY GATEWAY</span>
+        <h1 style="font-size: 1.6rem; font-weight: 700; color: #0F172A; margin: 8px 0 4px 0; letter-spacing: -0.02em;">월간 미디어·광고 인텔리전스 시스템</h1>
+        <p style="font-size: 0.88rem; color: #64748B; margin: 0;">사내 인가 사용자 전용 포털입니다. 승인 완료된 계정으로 로그인해 주세요.</p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    login_tab, signup_tab = st.tabs(["🔑 로그인", "📝 회원가입 신청"])
+    login_tab, signup_tab = st.tabs(["로그인", "회원가입 신청"])
     
     with login_tab:
         with st.form("login_form"):
@@ -465,7 +576,6 @@ if not st.session_state["logged_in"]:
                 if login_id in users_current:
                     user_info = users_current[login_id]
                     
-                    # [정상 인증 로직] 입력한 비밀번호 해시가 일치할 때만 정상 통과
                     if user_info["password"] == hash_password(login_pw):
                         if is_user_approved(user_info.get("approved", False)):
                             st.session_state["logged_in"] = True
@@ -476,11 +586,9 @@ if not st.session_state["logged_in"]:
                             
                             st.query_params["user"] = login_id
                             log_activity(login_id, st.session_state["user_name"], "로그인", "시스템 로그인 성공")
-                            
-                            st.success(f"환영합니다, {st.session_state['user_name']}님!")
                             st.rerun()
                         else:
-                            st.warning("⏳ 관리자 승인 대기 중입니다. 마스터 관리자의 승인 완료 후 이용하실 수 있습니다.")
+                            st.warning("관리자 승인 대기 중입니다. 승인 완료 후 이용하실 수 있습니다.")
                     else:
                         st.error("비밀번호가 올바르지 않습니다.")
                 else:
@@ -511,10 +619,10 @@ if not st.session_state["logged_in"]:
                     }
                     save_users(users_current)
                     log_activity(new_id, new_name, "회원가입 신청", f"아이디 '{new_id}' 가입 신청")
-                    st.success("🎉 회원가입 신청이 완료되었습니다! 관리자 승인 후 로그인하실 수 있습니다.")
+                    st.success("회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인하실 수 있습니다.")
     st.stop()
 
-# --- 4. 로그인 성공 후 공통 제어판 ---
+# --- 5. 로그인 성공 후 공통 제어판 ---
 df_issues, df_tv, df_pt, df_agency, loaded_files = load_all_data()
 df_pt_unique = df_pt.drop_duplicates(subset=["PT일자", "광고주", "품목"]) if not df_pt.empty else pd.DataFrame()
 
@@ -526,12 +634,17 @@ def get_stay_duration_str():
         return f"{minutes}분 {seconds}초"
     return "집계 불가"
 
-# 사이드바 설정
-st.sidebar.title("⚙️ 설정 및 제어판")
-st.sidebar.write(f"접속자: **{st.session_state['user_name']}** (`{st.session_state['role']}`)")
-st.sidebar.caption(f"현재 세션 체류 시간: **{get_stay_duration_str()}**")
+# 사이드바
+st.sidebar.markdown(f"""
+<div style="padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid #334155;">
+    <div style="font-size: 0.8rem; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.05em;">USER SESSION</div>
+    <div style="font-size: 1.05rem; font-weight: 700; color: #F8FAFC; margin-top: 4px;">{st.session_state['user_name']}</div>
+    <div style="font-size: 0.8rem; color: #38BDF8; font-weight: 500;">권한: {st.session_state['role']}</div>
+    <div style="font-size: 0.75rem; color: #94A3B8; margin-top: 4px;">체류 시간: {get_stay_duration_str()}</div>
+</div>
+""", unsafe_allow_html=True)
 
-if st.sidebar.button("로그아웃"):
+if st.sidebar.button("로그아웃", use_container_width=True):
     log_activity(
         st.session_state["username"], 
         st.session_state["user_name"], 
@@ -548,7 +661,7 @@ if st.sidebar.button("로그아웃"):
     st.rerun()
 
 # 내 정보 관리
-with st.sidebar.expander("👤 내 정보 관리", expanded=False):
+with st.sidebar.expander("내 정보 관리", expanded=False):
     with st.form("edit_profile_form"):
         curr_user_id = st.session_state["username"]
         users_current = load_users()
@@ -557,7 +670,7 @@ with st.sidebar.expander("👤 내 정보 관리", expanded=False):
         st.caption(f"아이디: **{curr_user_id}**")
         edit_name = st.text_input("이름(실명)", value=my_info.get("name", ""))
         curr_pw_input = st.text_input("현재 비밀번호 확인", type="password")
-        new_pw_input = st.text_input("새 비밀번호 (변경 시에만)", type="password")
+        new_pw_input = st.text_input("새 비밀번호 (변경 시)", type="password")
         new_pw_confirm = st.text_input("새 비밀번호 확인", type="password")
         
         save_profile_btn = st.form_submit_button("정보 저장")
@@ -578,7 +691,6 @@ with st.sidebar.expander("👤 내 정보 관리", expanded=False):
                         save_users(users_current)
                         st.session_state["user_name"] = edit_name
                         log_activity(curr_user_id, edit_name, "정보수정", "비밀번호 및 이름 변경")
-                        st.success("비밀번호 및 회원 정보가 성공적으로 변경되었습니다!")
                         st.rerun()
                 else:
                     my_info["name"] = edit_name
@@ -586,37 +698,33 @@ with st.sidebar.expander("👤 내 정보 관리", expanded=False):
                     save_users(users_current)
                     st.session_state["user_name"] = edit_name
                     log_activity(curr_user_id, edit_name, "정보수정", "이름 변경")
-                    st.success("회원 정보가 성공적으로 변경되었습니다!")
                     st.rerun()
 
 st.sidebar.markdown("---")
 
-# Secrets 연동
 api_key = st.secrets.get("GEMINI_API_KEY", None)
 if not api_key:
-    api_key = st.sidebar.text_input("🔑 Gemini API Key (선택)", type="password", help="API 키를 입력하면 AI 탭이 활성화됩니다.")
+    api_key = st.sidebar.text_input("Gemini API Key (선택)", type="password", help="API 키를 입력하면 AI 탭이 활성화됩니다.")
 else:
-    st.sidebar.caption("🤖 Gemini AI 연동 활성화됨")
+    st.sidebar.caption("Gemini AI 연동 활성화됨")
 
 # 마스터 전용 사이드바 메뉴
 if st.session_state["role"] == "admin":
     st.sidebar.markdown("---")
-    st.sidebar.subheader("👑 마스터 전용 메뉴")
+    st.sidebar.markdown("<div style='font-size:0.8rem; color:#94A3B8; text-transform:uppercase; margin-bottom:8px;'>MASTER CONSOLE</div>", unsafe_allow_html=True)
     
-    # [회원 관리] 별도 페이지 이동 버튼
     if not st.session_state.get("admin_view", False):
-        if st.sidebar.button("👥 [회원 관리]", type="primary", use_container_width=True):
+        if st.sidebar.button("회원 관리 콘솔", type="primary", use_container_width=True):
             st.session_state["admin_view"] = True
             st.rerun()
     else:
-        if st.sidebar.button("📊 [메인 대시보드 복귀]", type="secondary", use_container_width=True):
+        if st.sidebar.button("메인 대시보드 복귀", type="secondary", use_container_width=True):
             st.session_state["admin_view"] = False
             st.rerun()
             
-    # 사이드바 빠른 승인 창
     current_users_sb = load_users()
     pending_sb = {uid: info for uid, info in current_users_sb.items() if not is_user_approved(info.get("approved", False))}
-    with st.sidebar.expander(f"⚡ 빠른 회원 승인 ({len(pending_sb)}건 대기)", expanded=bool(pending_sb)):
+    with st.sidebar.expander(f"빠른 회원 승인 ({len(pending_sb)}건 대기)", expanded=bool(pending_sb)):
         if pending_sb:
             for uid, info in pending_sb.items():
                 st.write(f"**{info.get('name', uid)}** (`{uid}`)")
@@ -634,39 +742,42 @@ if st.session_state["role"] == "admin":
         else:
             st.caption("현재 승인 대기자가 없습니다.")
 
-    # 신규 엑셀 업로드
     new_file = st.sidebar.file_uploader("월간 엑셀 추가 (.xlsx)", type=["xlsx"])
     if new_file is not None:
         save_path = os.path.join(DATA_DIR, new_file.name)
         with open(save_path, "wb") as f:
             f.write(new_file.getbuffer())
-        st.sidebar.success(f"{new_file.name} 저장 완료!")
+        st.sidebar.success(f"{new_file.name} 저장 완료")
         log_activity(st.session_state["username"], st.session_state["user_name"], "엑셀 업로드", f"파일: {new_file.name}")
         st.cache_data.clear()
         st.rerun()
 
 st.sidebar.markdown("---")
-st.sidebar.write(f"📁 적재 완료 파일: **{len(loaded_files)}건**")
+st.sidebar.caption(f"적재 완료 파일: **{len(loaded_files)}건**")
 
 # =========================================================================
-# 5. [관리자 전용 페이지] 회원 관리 및 활동 로그 (admin_view == True 일 때)
+# 6. [관리자 전용 페이지] 회원 관리 및 활동 로그 (admin_view == True 일 때)
 # =========================================================================
 if st.session_state["role"] == "admin" and st.session_state.get("admin_view", False):
     c_head1, c_head2 = st.columns([4, 1])
     with c_head1:
-        st.title("👥 관리자 전용 회원 및 활동 관리 센터")
-        st.caption("가입 회원 리스트 승인/권한 관리 및 접속·활동 감사 로그를 한눈에 모니터링합니다.")
+        st.markdown("""
+        <div style="padding: 4px 0 16px 0;">
+            <span style="font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; color: #2563EB; background: #EFF6FF; padding: 3px 8px; border-radius: 4px; border: 1px solid #DBEAFE;">ADMINISTRATION</span>
+            <h2 style="font-size: 1.5rem; font-weight: 700; color: #0F172A; margin: 8px 0 4px 0; letter-spacing: -0.02em;">회원 권한 및 시스템 감사 콘솔</h2>
+            <p style="font-size: 0.88rem; color: #64748B; margin: 0;">가입 계정 승인/권한 관리 및 접속 활동 로그를 실시간 모니터링합니다.</p>
+        </div>
+        """, unsafe_allow_html=True)
     with c_head2:
         st.write("")
-        if st.button("⬅️ 메인 대시보드로 돌아가기", type="primary", use_container_width=True):
+        if st.button("대시보드로 돌아가기", type="primary", use_container_width=True):
             st.session_state["admin_view"] = False
             st.rerun()
 
     st.markdown("---")
     
-    admin_tab1, admin_tab2 = st.tabs(["📋 가입 회원 리스트 및 승인 관리", "🔍 회원 방문 및 활동 감사 로그"])
+    admin_tab1, admin_tab2 = st.tabs(["가입 회원 리스트 및 승인", "회원 방문 및 활동 로그"])
     
-    # 탭 A: 가입 회원 리스트
     with admin_tab1:
         all_users = load_users()
         pending_users_dict = {uid: info for uid, info in all_users.items() if not is_user_approved(info.get("approved", False))}
@@ -676,37 +787,32 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
         u_m2.metric("정상 승인 회원", f"{len(all_users) - len(pending_users_dict)}명")
         u_m3.metric("승인 대기 중", f"{len(pending_users_dict)}명")
         
-        st.markdown("---")
-        
-        st.subheader("⏳ 가입 신청 승인 대기 관리")
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("#### 가입 신청 승인 대기 목록")
         if pending_users_dict:
-            st.info(f"현재 총 **{len(pending_users_dict)}명**의 승인 대기자가 있습니다. 각 회원의 승인 또는 반려 버튼을 눌러주세요.")
             for uid, info in list(pending_users_dict.items()):
                 with st.container():
                     p_col1, p_col2, p_col3 = st.columns([3, 1, 1])
                     with p_col1:
-                        st.markdown(f"👤 이름: **{info.get('name', uid)}** &nbsp;|&nbsp; 아이디: `{uid}` &nbsp;|&nbsp; 권한: `{info.get('role', 'member')}`")
+                        st.markdown(f"이름: **{info.get('name', uid)}** &nbsp;|&nbsp; 아이디: `{uid}` &nbsp;|&nbsp; 권한: `{info.get('role', 'member')}`")
                     with p_col2:
-                        if st.button("✅ 승인하기", key=f"p_app_btn_{uid}", type="primary", use_container_width=True):
+                        if st.button("승인하기", key=f"p_app_btn_{uid}", type="primary", use_container_width=True):
                             all_users[uid]["approved"] = True
                             save_users(all_users)
                             log_activity(st.session_state["username"], st.session_state["user_name"], "회원 승인", f"승인: {uid}")
-                            st.success(f"{info.get('name', uid)}({uid}) 회원 승인 완료")
                             st.rerun()
                     with p_col3:
-                        if st.button("❌ 반려/삭제", key=f"p_del_btn_{uid}", use_container_width=True):
+                        if st.button("반려/삭제", key=f"p_del_btn_{uid}", use_container_width=True):
                             del all_users[uid]
                             save_users(all_users)
                             log_activity(st.session_state["username"], st.session_state["user_name"], "회원 반려", f"반려: {uid}")
-                            st.warning(f"{info.get('name', uid)}({uid}) 신청 반려됨")
                             st.rerun()
                     st.write("")
         else:
-            st.success("🎉 현재 승인 대기 중인 가입 신청이 없습니다. 모든 회원이 정상 승인 상태입니다.")
+            st.info("현재 대기 중인 가입 신청이 없습니다.")
 
-        st.markdown("---")
-        
-        st.subheader("👥 전체 가입 회원 목록 및 상태 제어")
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("#### 전체 계정 목록 및 상태 제어")
         h_col1, h_col2, h_col3, h_col4, h_col5 = st.columns([1.5, 1.5, 1.5, 1.5, 2])
         h_col1.markdown("**아이디**")
         h_col2.markdown("**이름**")
@@ -722,7 +828,7 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
             r_col1.write(f"`{u_id}`")
             r_col2.write(info.get("name", u_id))
             r_col3.write("관리자(admin)" if info.get("role") == "admin" else "일반회원(member)")
-            r_col4.write("🟢 승인됨" if is_app else "🟡 대기중")
+            r_col4.write("승인완료" if is_app else "승인대기")
             
             with r_col5:
                 btn_c1, btn_c2 = st.columns(2)
@@ -747,9 +853,8 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
                         log_activity(st.session_state["username"], st.session_state["user_name"], "회원 삭제", f"삭제: {u_id}")
                         st.rerun()
 
-    # 탭 B: 회원 활동 감사 로그
     with admin_tab2:
-        st.subheader("🔍 회원 방문 및 활동 실시간 로그")
+        st.markdown("#### 회원 방문 및 활동 감사 로그")
         df_logs = load_activity_logs()
         
         if not df_logs.empty:
@@ -763,10 +868,9 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
             with l_col3:
                 st.write("")
                 st.write("")
-                if st.button("🗑️ 감사 로그 전체 초기화", type="secondary"):
+                if st.button("감사 로그 전체 초기화", type="secondary"):
                     if os.path.exists(LOG_DB_FILE):
                         os.remove(LOG_DB_FILE)
-                    st.success("활동 로그가 초기화되었습니다.")
                     st.rerun()
 
             view_logs = df_logs.copy()
@@ -775,23 +879,36 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
             if selected_action != "전체 활동":
                 view_logs = view_logs[view_logs["활동 구분"] == selected_action]
 
-            st.caption(f"조회된 로그: **{len(view_logs)}건** / 총 보관 로그: **{len(df_logs)}건**")
+            st.caption(f"조회 로그: **{len(view_logs)}건** / 전체 로그: **{len(df_logs)}건**")
             st.dataframe(view_logs, use_container_width=True, hide_index=True)
         else:
-            st.info("아직 기록된 회원 활동 로그가 없습니다.")
+            st.info("기록된 회원 활동 로그가 없습니다.")
 
     st.stop()
 
 # =========================================================================
-# 6. [일반 메인 대시보드 화면]
+# 7. [일반 메인 대시보드 화면] - 정제된 비즈니스 헤더
 # =========================================================================
-st.title("📊 월간 미디어·광고 업계 동향 대시보드")
-st.caption("2021년 9월 이후 축적된 월간 동향 보고서를 다각도로 분석·조회하는 통합 인텔리전스 시스템")
+st.markdown("""
+<div style="padding: 6px 0 20px 0; border-bottom: 1px solid #E2E8F0; margin-bottom: 24px;">
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+        <div>
+            <span style="font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; color: #2563EB; background: #EFF6FF; padding: 3px 8px; border-radius: 4px; border: 1px solid #DBEAFE;">INTELLIGENCE REPORT</span>
+            <h1 style="font-size: 1.65rem; font-weight: 700; color: #0F172A; margin: 8px 0 4px 0; letter-spacing: -0.02em;">월간 미디어·광고 업계 동향 대시보드</h1>
+            <p style="font-size: 0.88rem; color: #64748B; margin: 0;">2021년 9월 이후 축적된 월간 동향 보고서 통합 분석 인텔리전스</p>
+        </div>
+        <div style="display: inline-flex; align-items: center; gap: 7px; background: #FFFFFF; border: 1px solid #E2E8F0; padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; color: #475569; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+            <span style="display: inline-block; width: 7px; height: 7px; background-color: #10B981; border-radius: 50%;"></span>
+            GitHub 동기화 완료
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
-# 🔍 실시간 통합 검색 영역
-st.markdown("### 🔍 업계 동향 전 카테고리 통합 검색")
+# 통합 검색 영역
+st.markdown("#### 전 카테고리 통합 검색")
 global_query = st.text_input(
-    "키워드를 입력하면 모든 엑셀 데이터(이슈, PT, 매출/매체사)에서 실시간으로 찾아냅니다.",
+    "키워드를 입력하면 모든 데이터(이슈, PT, 대행사/매체사 매출)에서 실시간으로 찾아냅니다.",
     placeholder="예: OTT, 현대, 제일기획, 카카오, 디즈니 등 입력 후 Enter"
 ).strip()
 
@@ -825,16 +942,16 @@ if global_query:
         matched_tv = df_tv[df_tv["채널"].str.contains(global_query, case=False, na=False)]
 
     tot_cnt = len(matched_issues) + len(matched_pt) + len(matched_agency) + len(matched_tv)
-    st.info(f"🔎 **'{global_query}'** 통합 검색 결과: 총 **{tot_cnt}건** 발견됨")
+    st.info(f"검색 결과: 총 **{tot_cnt}건** 발견")
     
     sc1, sc2, sc3, sc4 = st.columns(4)
-    sc1.metric("📰 주요 이슈", f"{len(matched_issues)}건")
-    sc2.metric("🎯 경쟁 PT 현황", f"{len(matched_pt)}건")
-    sc3.metric("🏢 대행사 매출 데이터", f"{len(matched_agency)}건")
-    sc4.metric("📺 방송 매체사 데이터", f"{len(matched_tv)}건")
+    sc1.metric("주요 이슈", f"{len(matched_issues)}건")
+    sc2.metric("경쟁 PT 현황", f"{len(matched_pt)}건")
+    sc3.metric("대행사 매출 데이터", f"{len(matched_agency)}건")
+    sc4.metric("방송 매체사 데이터", f"{len(matched_tv)}건")
     
     if len(matched_issues) > 0:
-        with st.expander(f"📰 주요 이슈 내 검색 결과 ({len(matched_issues)}건)", expanded=True):
+        with st.expander(f"주요 이슈 검색 결과 ({len(matched_issues)}건)", expanded=True):
             for _, row in matched_issues.iterrows():
                 headline_text = f"**[{row['연월']}]** {row['헤드라인']}"
                 if row['상세']:
@@ -843,7 +960,7 @@ if global_query:
                     st.markdown(f"- {headline_text}")
 
     if len(matched_pt) > 0:
-        with st.expander(f"🎯 PT 수주 현황 내 검색 결과 ({len(matched_pt)}건)", expanded=True):
+        with st.expander(f"PT 수주 현황 검색 결과 ({len(matched_pt)}건)", expanded=True):
             st.dataframe(
                 matched_pt[["발행연월", "PT일자", "광고주", "품목", "빌링_원문", "참여사", "선정사", "메모"]].rename(columns={"빌링_원문": "빌링(억원)"}),
                 hide_index=True,
@@ -851,33 +968,33 @@ if global_query:
             )
 
     if len(matched_agency) > 0 or len(matched_tv) > 0:
-        with st.expander(f"🏢 대행사 / 매체사 관련 검색 결과 ({len(matched_agency) + len(matched_tv)}건)", expanded=False):
+        with st.expander(f"대행사 / 매체사 관련 검색 결과 ({len(matched_agency) + len(matched_tv)}건)", expanded=False):
             if len(matched_agency) > 0:
-                st.caption("🏆 **대행사 매출 데이터**")
+                st.caption("대행사 매출 데이터")
                 st.dataframe(matched_agency[["연월", "대행사", "매출(억원)"]], hide_index=True, use_container_width=True)
             if len(matched_tv) > 0:
-                st.caption("📺 **방송 매체사 매출 데이터**")
+                st.caption("방송 매체사 매출 데이터")
                 st.dataframe(matched_tv[["연월", "구분", "채널", "매출(억원)"]], hide_index=True, use_container_width=True)
 
     if tot_cnt == 0:
-        st.warning(f"'{global_query}'에 대한 검색 결과가 업로드된 모든 자료에 없습니다.")
+        st.warning(f"'{global_query}'에 대한 검색 결과가 없습니다.")
     
     st.markdown("---")
 
 # 4개 메인 탭 영역
 tab1, tab2, tab3, tab4 = st.tabs([
-    "🎯 광고회사 PT 수주 현황", 
-    "🏢 대행사/매체사 매출 동향", 
-    "📰 월별 핵심 이슈 브리핑", 
-    "🤖 AI 동향 분석가"
+    "광고회사 PT 수주 현황", 
+    "대행사/매체사 매출 동향", 
+    "월별 핵심 이슈 브리핑", 
+    "AI 동향 분석가"
 ])
 
 # 탭 1: PT 수주 현황
 with tab1:
-    st.subheader("🎯 광고회사 경쟁 PT 모니터링 & 수주 분석")
+    st.markdown("#### 광고회사 경쟁 PT 모니터링 및 수주 분석")
     if not df_pt_unique.empty:
         available_years = sorted(list(set([str(y) for y in df_pt_unique["연도"].dropna() if str(y).isdigit()])), reverse=True)
-        selected_pt_year = st.selectbox("📅 PT 연도 선택", ["전체 연도"] + available_years)
+        selected_pt_year = st.selectbox("PT 연도 선택", ["전체 연도"] + available_years)
 
         view_pt = df_pt_unique.copy()
         if selected_pt_year != "전체 연도":
@@ -889,15 +1006,15 @@ with tab1:
         avg_b = view_pt[view_pt['빌링(억원)'] > 0]['빌링(억원)'].mean()
         m3.metric("평균 프로젝트 빌링", f"{avg_b:.1f}억원" if pd.notna(avg_b) else "집계중")
 
-        st.markdown("---")
+        st.markdown("<br>", unsafe_allow_html=True)
         f_col1, f_col2, f_col3 = st.columns([2, 2, 2])
         with f_col1:
-            search_query = st.text_input("🔍 광고주 또는 품목 검색", placeholder="예: 라이나, 카카오, 샴푸")
+            search_query = st.text_input("광고주 또는 품목 검색", placeholder="예: 라이나, 카카오, 샴푸")
         with f_col2:
             max_b_val = int(df_pt_unique['빌링(억원)'].max()) if df_pt_unique['빌링(억원)'].max() > 0 else 100
             min_b = st.slider("최소 빌링 (억원)", 0, max_b_val, 0)
         with f_col3:
-            winner_search = st.text_input("🏆 선정사(승자) 검색", placeholder="예: 제일, 이노션, 차이")
+            winner_search = st.text_input("선정사(승자) 검색", placeholder="예: 제일, 이노션, 차이")
 
         if search_query:
             view_pt = view_pt[view_pt["광고주"].str.contains(search_query, na=False) | view_pt["품목"].str.contains(search_query, na=False)]
@@ -912,15 +1029,15 @@ with tab1:
             hide_index=True
         )
     else:
-        st.warning("PT 데이터가 아직 없습니다.")
+        st.info("PT 데이터가 없습니다.")
 
 # 탭 2: 매출 동향
 with tab2:
-    st.subheader("🏢 광고대행사 및 방송 매체사 매출 추이 & YoY 분석")
+    st.markdown("#### 광고대행사 및 방송 매체사 매출 추이 & YoY 분석")
     
     view_mode = st.radio(
-        "보기 방식 선택",
-        ["📊 그래프 보기", "📋 상세 매출표 보기", "📊+📋 둘 다 보기"],
+        "보기 방식",
+        ["그래프 보기", "상세 매출표 보기", "둘 다 보기"],
         horizontal=True
     )
     st.markdown("---")
@@ -929,14 +1046,14 @@ with tab2:
     
     # [좌측] 대행사 영역
     with col_l:
-        st.markdown("#### 🏆 주요 광고대행사 전파광고 매출")
+        st.markdown("##### 주요 광고대행사 전파광고 매출")
         if not df_agency.empty:
             all_agencies = sorted(df_agency["대행사"].unique().tolist())
             agency_years = sorted(list(set([str(y) for y in df_agency["연도"].dropna() if str(y).isdigit()])), reverse=True)
             
             c_ag1, c_ag2 = st.columns([1.2, 1])
             with c_ag1:
-                selected_single_agency = st.selectbox("조회할 대행사 선택 (드롭다운)", all_agencies, key="sel_single_agency")
+                selected_single_agency = st.selectbox("대행사 선택", all_agencies, key="sel_single_agency")
             with c_ag2:
                 selected_ag_year = st.selectbox("조회 연도", ["전체 연도"] + agency_years, key="sel_ag_year")
 
@@ -947,17 +1064,24 @@ with tab2:
             else:
                 df_view_ag = df_single_ag
 
-            if view_mode in ["📊 그래프 보기", "📊+📋 둘 다 보기"]:
+            if view_mode in ["그래프 보기", "둘 다 보기"]:
                 fig_ag = px.bar(
                     df_view_ag, 
                     x="연월", 
                     y="매출(억원)", 
                     text_auto=True,
-                    title=f"[{selected_single_agency}] 매출 추이 ({selected_ag_year})"
+                    title=f"[{selected_single_agency}] 매출 추이 ({selected_ag_year})",
+                    color_discrete_sequence=["#1E3A8A"]
+                )
+                fig_ag.update_layout(
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    font_family="Pretendard",
+                    margin=dict(t=40, l=10, r=10, b=10)
                 )
                 st.plotly_chart(fig_ag, use_container_width=True)
 
-            if view_mode in ["📋 상세 매출표 보기", "📊+📋 둘 다 보기"]:
+            if view_mode in ["상세 매출표 보기", "둘 다 보기"]:
                 pivot_ag = df_view_ag.pivot_table(
                     index="대행사", 
                     columns="연월", 
@@ -967,7 +1091,7 @@ with tab2:
                 )
                 st.dataframe(pivot_ag, use_container_width=True)
 
-            with st.expander(f"📈 {selected_single_agency} YoY (전년 동월 대비) 비교 분석", expanded=False):
+            with st.expander(f"{selected_single_agency} YoY 비교 분석", expanded=False):
                 if len(agency_years) >= 2:
                     yoy_base_year = st.selectbox("기준 연도(당해)", agency_years, index=0, key="yoy_ag_base")
                     prev_year = str(int(yoy_base_year) - 1)
@@ -995,12 +1119,19 @@ with tab2:
                             x="월", 
                             y=[f"{prev_year}년", f"{yoy_base_year}년"], 
                             barmode="group",
+                            color_discrete_sequence=["#94A3B8", "#1E3A8A"],
                             title=f"{prev_year}년 vs {yoy_base_year}년 월별 매출 비교"
+                        )
+                        fig_yoy_ag.update_layout(
+                            plot_bgcolor="rgba(0,0,0,0)",
+                            paper_bgcolor="rgba(0,0,0,0)",
+                            font_family="Pretendard",
+                            margin=dict(t=40, l=10, r=10, b=10)
                         )
                         st.plotly_chart(fig_yoy_ag, use_container_width=True)
                         st.dataframe(df_yoy_ag, hide_index=True, use_container_width=True)
                     else:
-                        st.info(f"{prev_year}년 또는 {yoy_base_year}년 데이터가 부족하여 YoY 비교표를 구성할 수 없습니다.")
+                        st.info(f"{prev_year}년 또는 {yoy_base_year}년 데이터가 부족합니다.")
                 else:
                     st.caption("축적된 연도 데이터가 2개 이상일 때 YoY 분석이 가능합니다.")
         else:
@@ -1008,7 +1139,7 @@ with tab2:
 
     # [우측] 방송 매체사 영역
     with col_r:
-        st.markdown("#### 📺 방송 매체사 광고 매출")
+        st.markdown("##### 방송 매체사 광고 매출")
         if not df_tv.empty:
             tv_source = df_tv[df_tv["채널"] != "Total (광고매출 only)"]
             all_channels = sorted(tv_source["채널"].unique().tolist())
@@ -1016,7 +1147,7 @@ with tab2:
             
             c_tv1, c_tv2 = st.columns([1.2, 1])
             with c_tv1:
-                selected_single_tv = st.selectbox("조회할 방송 매체/채널 선택 (드롭다운)", all_channels, key="sel_single_tv")
+                selected_single_tv = st.selectbox("방송 채널 선택", all_channels, key="sel_single_tv")
             with c_tv2:
                 selected_tv_year = st.selectbox("조회 연도", ["전체 연도"] + tv_years, key="sel_tv_year")
 
@@ -1027,17 +1158,24 @@ with tab2:
             else:
                 df_view_tv = df_single_tv
 
-            if view_mode in ["📊 그래프 보기", "📊+📋 둘 다 보기"]:
+            if view_mode in ["그래프 보기", "둘 다 보기"]:
                 fig_tv = px.line(
                     df_view_tv, 
                     x="연월", 
                     y="매출(억원)", 
                     markers=True,
-                    title=f"[{selected_single_tv}] 매출 추이 ({selected_tv_year})"
+                    title=f"[{selected_single_tv}] 매출 추이 ({selected_tv_year})",
+                    color_discrete_sequence=["#1E3A8A"]
+                )
+                fig_tv.update_layout(
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    font_family="Pretendard",
+                    margin=dict(t=40, l=10, r=10, b=10)
                 )
                 st.plotly_chart(fig_tv, use_container_width=True)
 
-            if view_mode in ["📋 상세 매출표 보기", "📊+📋 둘 다 보기"]:
+            if view_mode in ["상세 매출표 보기", "둘 다 보기"]:
                 pivot_tv = df_view_tv.pivot_table(
                     index="채널", 
                     columns="연월", 
@@ -1047,7 +1185,7 @@ with tab2:
                 )
                 st.dataframe(pivot_tv, use_container_width=True)
 
-            with st.expander(f"📈 {selected_single_tv} YoY (전년 동월 대비) 비교 분석", expanded=False):
+            with st.expander(f"{selected_single_tv} YoY 비교 분석", expanded=False):
                 if len(tv_years) >= 2:
                     yoy_tv_base = st.selectbox("기준 연도(당해)", tv_years, index=0, key="yoy_tv_base")
                     prev_tv_year = str(int(yoy_tv_base) - 1)
@@ -1075,12 +1213,19 @@ with tab2:
                             x="월", 
                             y=[f"{prev_tv_year}년", f"{yoy_tv_base}년"], 
                             barmode="group",
+                            color_discrete_sequence=["#94A3B8", "#1E3A8A"],
                             title=f"{prev_tv_year}년 vs {yoy_tv_base}년 월별 매출 비교"
+                        )
+                        fig_yoy_tv.update_layout(
+                            plot_bgcolor="rgba(0,0,0,0)",
+                            paper_bgcolor="rgba(0,0,0,0)",
+                            font_family="Pretendard",
+                            margin=dict(t=40, l=10, r=10, b=10)
                         )
                         st.plotly_chart(fig_yoy_tv, use_container_width=True)
                         st.dataframe(df_yoy_tv, hide_index=True, use_container_width=True)
                     else:
-                        st.info(f"{prev_tv_year}년 또는 {yoy_tv_base}년 데이터가 부족하여 YoY 비교표를 구성할 수 없습니다.")
+                        st.info(f"{prev_tv_year}년 또는 {yoy_tv_base}년 데이터가 부족합니다.")
                 else:
                     st.caption("축적된 연도 데이터가 2개 이상일 때 YoY 분석이 가능합니다.")
         else:
@@ -1088,34 +1233,34 @@ with tab2:
 
 # 탭 3: 이슈 브리핑
 with tab3:
-    st.subheader("📰 월별 업계 이슈 & 정책 동향")
+    st.markdown("#### 월별 업계 주요 이슈 및 정책 동향")
     if not df_issues.empty:
-        selected_ym = st.selectbox("조회 연월 선택", options=sorted(df_issues["연월"].unique(), reverse=True))
+        selected_ym = st.selectbox("조회 연월", options=sorted(df_issues["연월"].unique(), reverse=True))
         ym_issues = df_issues[df_issues["연월"] == selected_ym]
         for hl in ym_issues["헤드라인"].unique():
-            with st.expander(f"📌 {hl}", expanded=True):
+            with st.expander(f"{hl}", expanded=True):
                 details = ym_issues[(ym_issues["헤드라인"] == hl) & (ym_issues["상세"] != "")]["상세"].tolist()
                 for d in details:
-                    st.write(f"- {d}")
+                    st.write(f"• {d}")
     else:
-        st.warning("이슈 데이터가 없습니다.")
+        st.info("이슈 데이터가 없습니다.")
 
 # 탭 4: AI 동향 분석가
 with tab4:
-    st.subheader("🤖 AI 기반 업계 동향 분석가")
+    st.markdown("#### AI 기반 인텔리전스 분석 어시스턴트")
     if not api_key:
-        st.warning("👈 왼쪽 사이드바에 'Gemini API Key'를 입력하시면 실시간 질의응답이 활성화됩니다.")
+        st.warning("사이드바에 'Gemini API Key'를 설정하시면 실시간 AI 질의응답이 활성화됩니다.")
     else:
         try:
             genai.configure(api_key=api_key)
             target_model = "gemini-3.6-flash"
             model = genai.GenerativeModel(target_model)
-            st.caption(f"연결된 AI 모델: `{target_model}`")
+            st.caption(f"연결 모델: `{target_model}`")
             
             user_question = st.text_input("질문을 입력하세요", placeholder="예: 최근 주요 광고주 PT 동향을 요약해줘")
             
             if st.button("AI 분석 요청", type="primary") and user_question:
-                with st.spinner("동향 데이터를 분석 중입니다..."):
+                with st.spinner("동향 데이터를 기반으로 분석을 생성 중입니다..."):
                     context_issues = df_issues.head(40).to_string(index=False)
                     context_pt = df_pt_unique.head(30).to_string(index=False)
                     
@@ -1146,11 +1291,11 @@ with tab4:
                         f"질문: {user_question[:40]}..."
                     )
                     
-                    st.markdown("### 💡 AI 분석 리포트")
+                    st.markdown("##### 인텔리전스 분석 리포트")
                     st.markdown(response.text)
         except Exception as e:
             err_msg = str(e)
             if "429" in err_msg:
-                st.error("⚠️ 일시적으로 무료 호출 한도에 도달했습니다. 잠시 후 다시 시도해 주세요.")
+                st.error("일시적으로 API 호출 한도에 도달했습니다. 잠시 후 다시 시도해 주세요.")
             else:
                 st.error(f"AI 호출 오류: {err_msg}")
