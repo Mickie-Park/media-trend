@@ -143,6 +143,8 @@ def load_all_data():
     for f in all_files:
         m = re.search(r'(\d{4})(\d{2})', f)
         ym = f"{m.group(1)}-{m.group(2)}" if m else "기타"
+        year_str = m.group(1) if m else "기타"
+        month_str = m.group(2) if m else "기타"
         
         try:
             xls = pd.ExcelFile(f)
@@ -183,52 +185,41 @@ def load_all_data():
                     memo = row_vals[7] if len(row_vals) > 7 else ""
                     
                     if pd.notna(client) and str(client).strip() != "광고주":
-                        if pd.notna(client) and str(client).strip() != "광고주":
                         client_str = str(client).strip()
                         date_raw_str = str(pt_date).strip() if pd.notna(pt_date) else ""
 
-                        # 1. PT일자 칸 또는 광고주 칸에 대행사명/구분선 텍스트가 들어간 경우 제외
+                        # 대행사명 및 구분선 행 제외 필터
                         excluded_agencies = [
                             "TBWA", "SM C&C", "HS AD", "차이커뮤니케이션", 
                             "제일기획", "이노션", "대홍기획", "Dentsu", "덴츠"
                         ]
-                        if any(ag in date_raw_str for ag in excluded_agencies) or any(ag == client_str for ag in excluded_agencies):
+                        if any(ag in date_raw_str for ag in excluded_agencies) or any(ag in client_str for ag in excluded_agencies):
                             continue
 
-                        # 2. '광고회사 PT' 관련 소제목이나 요약 텍스트 행 제외
                         if "광고회사" in client_str or "종합편" in client_str:
                             continue
 
                         date_str = pt_date.strftime("%Y-%m-%d") if isinstance(pt_date, pd.Timestamp) else date_raw_str
+                        
+                        # 연도 추출 (일자 텍스트 또는 발행연월 기반)
+                        pt_year = year_str
+                        ymatch = re.search(r'(\d{4})', date_str)
+                        if ymatch:
+                            pt_year = ymatch.group(1)
+
                         billing_val = 0.0
                         b_match = re.search(r'(\d+)', str(billing))
                         if b_match:
-                            try: billing_val = float(b_match.group(1))
-                            except: pass
+                            try:
+                                billing_val = float(b_match.group(1))
+                            except:
+                                pass
                             
                         pt_list.append({
                             "발행연월": ym,
+                            "연도": pt_year,
                             "PT일자": date_str,
                             "광고주": client_str,
-                            "품목": str(product).strip() if pd.notna(product) else "",
-                            "빌링(억원)": billing_val,
-                            "빌링_원문": str(billing).strip() if pd.notna(billing) else "",
-                            "참여사": str(participants).strip() if pd.notna(participants) else "",
-                            "기존사": str(incumbent).strip() if pd.notna(incumbent) else "",
-                            "선정사": str(winner).strip() if pd.notna(winner) else "",
-                            "메모": str(memo).strip() if pd.notna(memo) else ""
-                        })
-                        date_str = pt_date.strftime("%Y-%m-%d") if isinstance(pt_date, pd.Timestamp) else (str(pt_date).strip() if pd.notna(pt_date) else "")
-                        billing_val = 0.0
-                        b_match = re.search(r'(\d+)', str(billing))
-                        if b_match:
-                            try: billing_val = float(b_match.group(1))
-                            except: pass
-                            
-                        pt_list.append({
-                            "발행연월": ym,
-                            "PT일자": date_str,
-                            "광고주": str(client).strip(),
                             "품목": str(product).strip() if pd.notna(product) else "",
                             "빌링(억원)": billing_val,
                             "빌링_원문": str(billing).strip() if pd.notna(billing) else "",
@@ -249,7 +240,13 @@ def load_all_data():
                         if any(ag in name_candidate for ag in ["제일기획", "이노션", "대홍기획", "HS AD", "TBWA", "SM C&C", "Dentsu"]):
                             try:
                                 val = float(str(agency_row[1]).replace(',', '').strip())
-                                agency_sales_list.append({"연월": ym, "대행사": name_candidate, "매출(억원)": val})
+                                agency_sales_list.append({
+                                    "연월": ym,
+                                    "연도": year_str,
+                                    "월": f"{int(month_str)}월" if month_str.isdigit() else month_str,
+                                    "대행사": name_candidate,
+                                    "매출(억원)": val
+                                })
                             except: pass
 
             # D. 방송사 매출
@@ -264,7 +261,14 @@ def load_all_data():
                             if any(tv in ch_name for tv in ["KBS", "MBC", "SBS", "Total"]):
                                 try:
                                     val = float(str(sub_row[1]).replace(',', '').strip())
-                                    tv_sales_list.append({"연월": ym, "채널": ch_name, "매출(억원)": val, "구분": "지상파"})
+                                    tv_sales_list.append({
+                                        "연월": ym,
+                                        "연도": year_str,
+                                        "월": f"{int(month_str)}월" if month_str.isdigit() else month_str,
+                                        "채널": ch_name,
+                                        "매출(억원)": val,
+                                        "구분": "지상파"
+                                    })
                                 except: pass
 
                 if any("종합/유선채널" in x for x in row_vals):
@@ -276,7 +280,14 @@ def load_all_data():
                             if any(tv in ch_name for tv in ["TV Chosun", "MBN", "Channel A", "JTBC", "SBS Plus", "SPOTV"]):
                                 try:
                                     val = float(str(sub_row[1]).replace(',', '').strip())
-                                    tv_sales_list.append({"연월": ym, "채널": ch_name, "매출(억원)": val, "구분": "종편/유선"})
+                                    tv_sales_list.append({
+                                        "연월": ym,
+                                        "연도": year_str,
+                                        "월": f"{int(month_str)}월" if month_str.isdigit() else month_str,
+                                        "채널": ch_name,
+                                        "매출(억원)": val,
+                                        "구분": "종편/유선"
+                                    })
                                 except: pass
         except Exception as e:
             st.error(f"{f} 파싱 오류: {e}")
@@ -499,7 +510,7 @@ st.title("📊 월간 미디어·광고 업계 동향 대시보드")
 st.caption("2021년 9월 이후 축적된 월간 동향 보고서를 다각도로 분석·조회하는 통합 인텔리전스 시스템")
 
 # ==========================================
-# 🔍 3. 메인 화면 전 카테고리 실시간 통합 검색 영역
+# 🔍 메인 화면 전 카테고리 실시간 통합 검색 영역
 # ==========================================
 st.markdown("### 🔍 업계 동향 전 카테고리 통합 검색")
 global_query = st.text_input(
@@ -508,7 +519,6 @@ global_query = st.text_input(
 ).strip()
 
 if global_query:
-    # A. 이슈 데이터 검색
     matched_issues = pd.DataFrame()
     if not df_issues.empty:
         cond_issue = (
@@ -517,7 +527,6 @@ if global_query:
         )
         matched_issues = df_issues[cond_issue]
         
-    # B. PT 데이터 검색
     matched_pt = pd.DataFrame()
     if not df_pt_unique.empty:
         cond_pt = (
@@ -530,7 +539,6 @@ if global_query:
         )
         matched_pt = df_pt_unique[cond_pt]
         
-    # C. 대행사/방송사 검색
     matched_agency = pd.DataFrame()
     if not df_agency.empty:
         matched_agency = df_agency[df_agency["대행사"].str.contains(global_query, case=False, na=False)]
@@ -539,7 +547,6 @@ if global_query:
     if not df_tv.empty:
         matched_tv = df_tv[df_tv["채널"].str.contains(global_query, case=False, na=False)]
 
-    # 카테고리별 검색 결과 건수 메트릭
     tot_cnt = len(matched_issues) + len(matched_pt) + len(matched_agency) + len(matched_tv)
     st.info(f"🔎 **'{global_query}'** 통합 검색 결과: 총 **{tot_cnt}건** 발견됨")
     
@@ -549,7 +556,6 @@ if global_query:
     sc3.metric("🏢 대행사 매출 데이터", f"{len(matched_agency)}건")
     sc4.metric("📺 방송 매체사 데이터", f"{len(matched_tv)}건")
     
-    # 검색 결과 상세 나열 Expander
     if len(matched_issues) > 0:
         with st.expander(f"📰 주요 이슈 내 검색 결과 ({len(matched_issues)}건)", expanded=True):
             for _, row in matched_issues.iterrows():
@@ -582,7 +588,7 @@ if global_query:
     st.markdown("---")
 
 # ==========================================
-# 기존 4개 상세 탭 영역
+# 4개 메인 탭 영역
 # ==========================================
 tab1, tab2, tab3, tab4 = st.tabs([
     "🎯 광고회사 PT 수주 현황", 
@@ -591,14 +597,24 @@ tab1, tab2, tab3, tab4 = st.tabs([
     "🤖 AI 동향 분석가"
 ])
 
-# 탭 1: PT 수주 현황
+# -------------------------------------------------------------
+# 탭 1: PT 수주 현황 (연도 선택 필터 적용)
+# -------------------------------------------------------------
 with tab1:
     st.subheader("🎯 광고회사 경쟁 PT 모니터링 & 수주 분석")
     if not df_pt_unique.empty:
+        # 1. 연도 선택 필터
+        available_years = sorted(list(set([str(y) for y in df_pt_unique["연도"].dropna() if str(y).isdigit()])), reverse=True)
+        selected_pt_year = st.selectbox("📅 PT 연도 선택", ["전체 연도"] + available_years)
+
+        view_pt = df_pt_unique.copy()
+        if selected_pt_year != "전체 연도":
+            view_pt = view_pt[view_pt["연도"] == selected_pt_year]
+
         m1, m2, m3 = st.columns(3)
-        m1.metric("총 모니터링 PT 건수", f"{len(df_pt_unique)}건")
-        m2.metric("집계된 총 빌링 규모", f"{int(df_pt_unique['빌링(억원)'].sum()):,}억원")
-        avg_b = df_pt_unique[df_pt_unique['빌링(억원)'] > 0]['빌링(억원)'].mean()
+        m1.metric(f"PT 모니터링 건수 ({selected_pt_year})", f"{len(view_pt)}건")
+        m2.metric("집계된 빌링 규모", f"{int(view_pt['빌링(억원)'].sum()):,}억원")
+        avg_b = view_pt[view_pt['빌링(억원)'] > 0]['빌링(억원)'].mean()
         m3.metric("평균 프로젝트 빌링", f"{avg_b:.1f}억원" if pd.notna(avg_b) else "집계중")
 
         st.markdown("---")
@@ -606,11 +622,11 @@ with tab1:
         with f_col1:
             search_query = st.text_input("🔍 광고주 또는 품목 검색", placeholder="예: 라이나, 카카오, 샴푸")
         with f_col2:
-            min_b = st.slider("최소 빌링 (억원)", 0, int(df_pt_unique['빌링(억원)'].max() if df_pt_unique['빌링(억원)'].max() > 0 else 100), 0)
+            max_b_val = int(df_pt_unique['빌링(억원)'].max()) if df_pt_unique['빌링(억원)'].max() > 0 else 100
+            min_b = st.slider("최소 빌링 (억원)", 0, max_b_val, 0)
         with f_col3:
             winner_search = st.text_input("🏆 선정사(승자) 검색", placeholder="예: 제일, 이노션, 차이")
 
-        view_pt = df_pt_unique.copy()
         if search_query:
             view_pt = view_pt[view_pt["광고주"].str.contains(search_query, na=False) | view_pt["품목"].str.contains(search_query, na=False)]
         if min_b > 0:
@@ -626,9 +642,11 @@ with tab1:
     else:
         st.warning("PT 데이터가 아직 없습니다.")
 
-# 탭 2: 매출 동향 (그래프 / 매출표 / 둘 다 보기 옵션 제공)
+# -------------------------------------------------------------
+# 탭 2: 매출 동향 (드롭다운 회사 선택 + 연도 필터 + YoY 비교 분석)
+# -------------------------------------------------------------
 with tab2:
-    st.subheader("🏢 광고대행사 및 방송 매체사 매출 추이")
+    st.subheader("🏢 광고대행사 및 방송 매체사 매출 추이 & YoY 분석")
     
     view_mode = st.radio(
         "보기 방식 선택",
@@ -639,87 +657,176 @@ with tab2:
     
     col_l, col_r = st.columns(2)
     
+    # [좌측] 주요 광고대행사 영역
     with col_l:
         st.markdown("#### 🏆 주요 광고대행사 전파광고 매출")
         if not df_agency.empty:
             all_agencies = sorted(df_agency["대행사"].unique().tolist())
-            selected_agencies = st.multiselect(
-                "조회할 대행사 선택",
-                options=all_agencies,
-                default=all_agencies,
-                key="sel_agency",
-                help="비교하고 싶은 대행사만 클릭하거나 검색해 필터링할 수 있습니다."
-            )
-            filtered_agency = df_agency[df_agency["대행사"].isin(selected_agencies)]
+            agency_years = sorted(list(set([str(y) for y in df_agency["연도"].dropna() if str(y).isdigit()])), reverse=True)
             
-            if not filtered_agency.empty:
-                if view_mode in ["📊 그래프 보기", "📊+📋 둘 다 보기"]:
-                    fig_agency = px.bar(
-                        filtered_agency, 
-                        x="대행사", 
-                        y="매출(억원)", 
-                        color="연월", 
-                        barmode="group", 
-                        text_auto=True
-                    )
-                    st.plotly_chart(fig_agency, width="stretch")
-                
-                if view_mode in ["📋 상세 매출표 보기", "📊+📋 둘 다 보기"]:
-                    st.caption("📋 **대행사별 월별 매출 집계표 (단위: 억원)**")
-                    pivot_agency = filtered_agency.pivot_table(
-                        index="대행사", 
-                        columns="연월", 
-                        values="매출(억원)", 
-                        aggfunc="sum",
-                        fill_value=0
-                    )
-                    st.dataframe(pivot_agency, width="stretch")
+            c_ag1, c_ag2 = st.columns([1.2, 1])
+            with c_ag1:
+                selected_single_agency = st.selectbox("조회할 대행사 선택 (드롭다운)", all_agencies, key="sel_single_agency")
+            with c_ag2:
+                selected_ag_year = st.selectbox("조회 연도", ["전체 연도"] + agency_years, key="sel_ag_year")
+
+            df_single_ag = df_agency[df_agency["대행사"] == selected_single_agency]
+            
+            if selected_ag_year != "전체 연도":
+                df_view_ag = df_single_ag[df_single_ag["연도"] == selected_ag_year]
             else:
-                st.warning("선택된 대행사가 없습니다. 위에서 대행사를 선택해 주세요.")
+                df_view_ag = df_single_ag
+
+            # 그래프
+            if view_mode in ["📊 그래프 보기", "📊+📋 둘 다 보기"]:
+                fig_ag = px.bar(
+                    df_view_ag, 
+                    x="연월", 
+                    y="매출(억원)", 
+                    text_auto=True,
+                    title=f"[{selected_single_agency}] 매출 추이 ({selected_ag_year})"
+                )
+                st.plotly_chart(fig_ag, width="stretch")
+
+            # 상세 매출표
+            if view_mode in ["📋 상세 매출표 보기", "📊+📋 둘 다 보기"]:
+                pivot_ag = df_view_ag.pivot_table(
+                    index="대행사", 
+                    columns="연월", 
+                    values="매출(억원)", 
+                    aggfunc="sum",
+                    fill_value=0
+                )
+                st.dataframe(pivot_ag, width="stretch")
+
+            # YoY 전년 동월 대비 분석 Expander
+            with st.expander(f"📈 {selected_single_agency} YoY (전년 동월 대비) 비교 분석", expanded=False):
+                if len(agency_years) >= 2:
+                    yoy_base_year = st.selectbox("기준 연도(당해)", agency_years, index=0, key="yoy_ag_base")
+                    prev_year = str(int(yoy_base_year) - 1)
+                    
+                    df_curr = df_single_ag[df_single_ag["연도"] == yoy_base_year][["월", "매출(억원)"]].rename(columns={"매출(억원)": f"{yoy_base_year}년"})
+                    df_prev = df_single_ag[df_single_ag["연도"] == prev_year][["월", "매출(억원)"]].rename(columns={"매출(억원)": f"{prev_year}년"})
+                    
+                    if not df_curr.empty and not df_prev.empty:
+                        df_yoy_ag = pd.merge(df_prev, df_curr, on="월", how="outer").fillna(0)
+                        
+                        # 월 순서 정렬
+                        def month_sort_key(m):
+                            digits = re.findall(r'\d+', str(m))
+                            return int(digits[0]) if digits else 99
+                        df_yoy_ag["월순서"] = df_yoy_ag["월"].apply(month_sort_key)
+                        df_yoy_ag = df_yoy_ag.sort_values(by="월순서").drop(columns=["월순서"])
+                        
+                        df_yoy_ag["증감액(억원)"] = df_yoy_ag[f"{yoy_base_year}년"] - df_yoy_ag[f"{prev_year}년"]
+                        df_yoy_ag["YoY 증감률(%)"] = df_yoy_ag.apply(
+                            lambda r: f"{((r[f'{yoy_base_year}년'] - r[f'{prev_year}년']) / r[f'{prev_year}년'] * 100):+.1f}%" 
+                            if r[f"{prev_year}년"] > 0 else "-", axis=1
+                        )
+                        
+                        # YoY 비교 차트
+                        fig_yoy_ag = px.bar(
+                            df_yoy_ag, 
+                            x="월", 
+                            y=[f"{prev_year}년", f"{yoy_base_year}년"], 
+                            barmode="group",
+                            title=f"{prev_year}년 vs {yoy_base_year}년 월별 매출 비교"
+                        )
+                        st.plotly_chart(fig_yoy_ag, width="stretch")
+                        st.dataframe(df_yoy_ag, hide_index=True, width="stretch")
+                    else:
+                        st.info(f"{prev_year}년 또는 {yoy_base_year}년 데이터가 부족하여 YoY 비교표를 구성할 수 없습니다.")
+                else:
+                    st.caption("축적된 연도 데이터가 2개 이상일 때 YoY 분석이 가능합니다.")
         else:
             st.info("대행사 매출 집계 중")
-            
+
+    # [우측] 방송 매체사 영역
     with col_r:
         st.markdown("#### 📺 방송 매체사 광고 매출")
         if not df_tv.empty:
             tv_source = df_tv[df_tv["채널"] != "Total (광고매출 only)"]
             all_channels = sorted(tv_source["채널"].unique().tolist())
-            selected_channels = st.multiselect(
-                "조회할 방송 매체/채널 선택",
-                options=all_channels,
-                default=all_channels,
-                key="sel_tv",
-                help="추이를 확인하고 싶은 채널만 필터링할 수 있습니다."
-            )
-            filtered_tv = tv_source[tv_source["채널"].isin(selected_channels)]
+            tv_years = sorted(list(set([str(y) for y in tv_source["연도"].dropna() if str(y).isdigit()])), reverse=True)
             
-            if not filtered_tv.empty:
-                if view_mode in ["📊 그래프 보기", "📊+📋 둘 다 보기"]:
-                    fig_tv = px.line(
-                        filtered_tv, 
-                        x="연월", 
-                        y="매출(억원)", 
-                        color="채널", 
-                        markers=True
-                    )
-                    st.plotly_chart(fig_tv, width="stretch")
-                
-                if view_mode in ["📋 상세 매출표 보기", "📊+📋 둘 다 보기"]:
-                    st.caption("📋 **방송사/채널별 월별 매출 집계표 (단위: 억원)**")
-                    pivot_tv = filtered_tv.pivot_table(
-                        index="채널", 
-                        columns="연월", 
-                        values="매출(억원)", 
-                        aggfunc="sum",
-                        fill_value=0
-                    )
-                    st.dataframe(pivot_tv, width="stretch")
+            c_tv1, c_tv2 = st.columns([1.2, 1])
+            with c_tv1:
+                selected_single_tv = st.selectbox("조회할 방송 매체/채널 선택 (드롭다운)", all_channels, key="sel_single_tv")
+            with c_tv2:
+                selected_tv_year = st.selectbox("조회 연도", ["전체 연도"] + tv_years, key="sel_tv_year")
+
+            df_single_tv = tv_source[tv_source["채널"] == selected_single_tv]
+            
+            if selected_tv_year != "전체 연도":
+                df_view_tv = df_single_tv[df_single_tv["연도"] == selected_tv_year]
             else:
-                st.warning("선택된 매체/채널이 없습니다. 위에서 채널을 선택해 주세요.")
+                df_view_tv = df_single_tv
+
+            # 그래프
+            if view_mode in ["📊 그래프 보기", "📊+📋 둘 다 보기"]:
+                fig_tv = px.line(
+                    df_view_tv, 
+                    x="연월", 
+                    y="매출(억원)", 
+                    markers=True,
+                    title=f"[{selected_single_tv}] 매출 추이 ({selected_tv_year})"
+                )
+                st.plotly_chart(fig_tv, width="stretch")
+
+            # 상세 매출표
+            if view_mode in ["📋 상세 매출표 보기", "📊+📋 둘 다 보기"]:
+                pivot_tv = df_view_tv.pivot_table(
+                    index="채널", 
+                    columns="연월", 
+                    values="매출(억원)", 
+                    aggfunc="sum",
+                    fill_value=0
+                )
+                st.dataframe(pivot_tv, width="stretch")
+
+            # YoY 전년 동월 대비 분석 Expander
+            with st.expander(f"📈 {selected_single_tv} YoY (전년 동월 대비) 비교 분석", expanded=False):
+                if len(tv_years) >= 2:
+                    yoy_tv_base = st.selectbox("기준 연도(당해)", tv_years, index=0, key="yoy_tv_base")
+                    prev_tv_year = str(int(yoy_tv_base) - 1)
+                    
+                    df_curr_tv = df_single_tv[df_single_tv["연도"] == yoy_tv_base][["월", "매출(억원)"]].rename(columns={"매출(억원)": f"{yoy_tv_base}년"})
+                    df_prev_tv = df_single_tv[df_single_tv["연도"] == prev_tv_year][["월", "매출(억원)"]].rename(columns={"매출(억원)": f"{prev_tv_year}년"})
+                    
+                    if not df_curr_tv.empty and not df_prev_tv.empty:
+                        df_yoy_tv = pd.merge(df_prev_tv, df_curr_tv, on="월", how="outer").fillna(0)
+                        
+                        def month_sort_key(m):
+                            digits = re.findall(r'\d+', str(m))
+                            return int(digits[0]) if digits else 99
+                        df_yoy_tv["월순서"] = df_yoy_tv["월"].apply(month_sort_key)
+                        df_yoy_tv = df_yoy_tv.sort_values(by="월순서").drop(columns=["월순서"])
+                        
+                        df_yoy_tv["증감액(억원)"] = df_yoy_tv[f"{yoy_tv_base}년"] - df_yoy_tv[f"{prev_tv_year}년"]
+                        df_yoy_tv["YoY 증감률(%)"] = df_yoy_tv.apply(
+                            lambda r: f"{((r[f'{yoy_tv_base}년'] - r[f'{prev_tv_year}년']) / r[f'{prev_tv_year}년'] * 100):+.1f}%" 
+                            if r[f"{prev_tv_year}년"] > 0 else "-", axis=1
+                        )
+                        
+                        fig_yoy_tv = px.bar(
+                            df_yoy_tv, 
+                            x="월", 
+                            y=[f"{prev_tv_year}년", f"{yoy_tv_base}년"], 
+                            barmode="group",
+                            title=f"{prev_tv_year}년 vs {yoy_tv_base}년 월별 매출 비교"
+                        )
+                        st.plotly_chart(fig_yoy_tv, width="stretch")
+                        st.dataframe(df_yoy_tv, hide_index=True, width="stretch")
+                    else:
+                        st.info(f"{prev_tv_year}년 또는 {yoy_tv_base}년 데이터가 부족하여 YoY 비교표를 구성할 수 없습니다.")
+                else:
+                    st.caption("축적된 연도 데이터가 2개 이상일 때 YoY 분석이 가능합니다.")
         else:
             st.info("방송사 매출 집계 중")
 
+# -------------------------------------------------------------
 # 탭 3: 이슈 브리핑
+# -------------------------------------------------------------
 with tab3:
     st.subheader("📰 월별 업계 이슈 & 정책 동향")
     if not df_issues.empty:
@@ -733,7 +840,9 @@ with tab3:
     else:
         st.warning("이슈 데이터가 없습니다.")
 
+# -------------------------------------------------------------
 # 탭 4: AI 동향 분석가
+# -------------------------------------------------------------
 with tab4:
     st.subheader("🤖 AI 기반 업계 동향 분석가")
     if not api_key:
