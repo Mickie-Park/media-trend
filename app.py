@@ -166,6 +166,7 @@ if "logged_in" not in st.session_state:
     st.session_state["role"] = None
     st.session_state["user_name"] = None
     st.session_state["login_time"] = None
+    st.session_state["admin_view"] = False
 
 # URL 파라미터 기반 F5 새로고침 로그인 복원
 auth_token = st.query_params.get("user", None)
@@ -178,7 +179,7 @@ if auth_token and not st.session_state["logged_in"]:
         st.session_state["user_name"] = users_current[auth_token].get("name", auth_token)
         st.session_state["login_time"] = get_now_kst()
 
-# --- 2. 엑셀 데이터 파싱 함수 (전수 파싱 및 필터 보정) ---
+# --- 2. 엑셀 데이터 파싱 함수 (오류 수정 및 정밀 분리) ---
 @st.cache_data
 def load_all_data():
     raw_files = glob.glob("**/*.[xX][lL][sS][xX]", recursive=True)
@@ -245,7 +246,6 @@ def load_all_data():
                         client_str = str(client).strip()
                         date_raw_str = str(pt_date).strip() if pd.notna(pt_date) else ""
 
-                        # 대행사명 및 구분선 행 제외 필터
                         excluded_agencies = [
                             "TBWA", "SM C&C", "HS AD", "차이커뮤니케이션", 
                             "제일기획", "이노션", "대홍기획", "Dentsu", "덴츠"
@@ -258,7 +258,6 @@ def load_all_data():
 
                         date_str = pt_date.strftime("%Y-%m-%d") if isinstance(pt_date, pd.Timestamp) else date_raw_str
                         
-                        # 연도 추출
                         pt_year = year_str
                         ymatch = re.search(r'(\d{4})', date_str)
                         if ymatch:
@@ -286,85 +285,127 @@ def load_all_data():
                             "메모": str(memo).strip() if pd.notna(memo) else ""
                         })
 
-            # C. 대행사 전파광고 매출 (전수 수집)
+            # C. 대행사 전파광고 매출 (매체사 유입 방지 및 엄격한 범위 제한)
             for i in range(len(df)):
                 row_str = " ".join([str(x) for x in df.iloc[i].dropna().tolist()])
                 if "광고회사 전파광고" in row_str or "대행사 전파광고" in row_str:
                     for offset in range(2, 45):
                         if i + offset >= len(df): break
                         agency_row = df.iloc[i + offset].tolist()
-                        name_candidate = str(agency_row[0]).strip() if pd.notna(agency_row[0]) else ""
+                        row_full_text = " ".join([str(x) for x in agency_row if pd.notna(x)])
                         
-                        if not name_candidate or name_candidate in ["nan", "대행사", "광고회사", "회사명", "구분"]:
+                        # 방송/매체사 테이블이 시작되면 대행사 수집 즉시 종료
+                        if any(stop_kw in row_full_text for stop_kw in ["지상파 매출", "지상파 광고", "종합/유선채널", "유선채널", "방송사 매출"]):
+                            break
+
+                        name_candidate = ""
+                        for val_cell in agency_row[:3]:
+                            if pd.notna(val_cell):
+                                c_str = str(val_cell).strip()
+                                # 순수 숫자나 특수문자, 불필요 헤더는 회사명이 아님
+                                if c_str and not re.match(r'^\d+(\.\d+)?$', c_str):
+                                    if not any(ign in c_str for ign in ["대행사", "광고회사", "회사명", "구분", "순위", "합계", "Total", "소계", "전파광고", "매출"]):
+                                        name_candidate = c_str
+                                        break
+                        
+                        if not name_candidate:
                             continue
-                        if any(x in name_candidate for x in ["전파광고", "매출액", "순위", "합계", "Total", "소계"]):
+
+                        # 방송사명이 대행사에 섞여 들어가는 것 방지
+                        if any(b_name in name_candidate for b_name in ["KBS", "MBC", "SBS", "JTBC", "TV Chosun", "TV조선", "채널A", "Channel A", "MBN", "CJ ENM", "CJ E&M", "SPOTV"]):
                             continue
                         
-                        val = None
-                        for col_idx in [1, 2]:
-                            if len(agency_row) > col_idx and pd.notna(agency_row[col_idx]):
-                                raw_v = str(agency_row[col_idx]).replace(',', '').replace(' ', '').strip()
+                        # 매출 숫자 추출
+                        sales_val = None
+                        for c_item in agency_row:
+                            if pd.notna(c_item):
+                                clean_num = str(c_item).replace(',', '').replace(' ', '').strip()
                                 try:
-                                    val = float(raw_v)
-                                    break
+                                    f_num = float(clean_num)
+                                    if f_num > 0 and f_num != float(name_candidate if name_candidate.isdigit() else -1):
+                                        sales_val = f_num
+                                        break
                                 except:
                                     pass
                         
-                        if val is not None and val > 0:
+                        if sales_val is not None:
                             agency_sales_list.append({
                                 "연월": ym,
                                 "연도": year_str,
                                 "월": f"{int(month_str)}월" if month_str.isdigit() else month_str,
                                 "대행사": name_candidate,
-                                "매출(억원)": val
+                                "매출(억원)": sales_val
                             })
 
-            # D. 방송/미디어 매체사 매출 (CJ ENM 등 전수 수집)
+            # D. 방송/미디어 매체사 매출 (숫자가 아닌 실제 채널/매체명 정확 탐색)
             for i in range(len(df)):
                 row_vals = [str(x) for x in df.iloc[i].dropna().tolist()]
                 row_text = " ".join(row_vals)
                 
-                # 지상파 섹션
+                # 1) 지상파 섹션
                 if "지상파 매출" in row_text or "지상파 광고" in row_text:
                     for offset in range(1, 15):
                         if i + offset >= len(df): break
-                        sub_row = df.iloc[i + offset].dropna().tolist()
-                        if len(sub_row) >= 2:
-                            ch_name = str(sub_row[0]).strip()
-                            if not ch_name or any(x in ch_name for x in ["구분", "채널", "매출", "합계", "Total", "소계"]):
-                                continue
-                            try:
-                                val = float(str(sub_row[1]).replace(',', '').strip())
-                                tv_sales_list.append({
-                                    "연월": ym,
-                                    "연도": year_str,
-                                    "월": f"{int(month_str)}월" if month_str.isdigit() else month_str,
-                                    "채널": ch_name,
-                                    "매출(억원)": val,
-                                    "구분": "지상파"
-                                })
-                            except: pass
+                        sub_row = df.iloc[i + offset].tolist()
+                        
+                        ch_name = ""
+                        sales_val = None
+                        
+                        # 행에서 문자열 채널명과 숫자 매출 분리 추출
+                        for item in sub_row:
+                            if pd.notna(item):
+                                it_str = str(item).strip()
+                                # 숫자가 아닌 경우 채널명 후보
+                                if not ch_name and not re.match(r'^-?\d+(\.\d+)?$', it_str.replace(',', '')):
+                                    if not any(ign in it_str for ign in ["구분", "채널", "매출", "합계", "소계", "순위", "지상파", "Total"]):
+                                        ch_name = it_str
+                                # 숫자인 경우 매출 후보
+                                elif sales_val is None:
+                                    try:
+                                        sales_val = float(it_str.replace(',', ''))
+                                    except:
+                                        pass
+                        
+                        if ch_name and sales_val is not None and sales_val > 0:
+                            tv_sales_list.append({
+                                "연월": ym,
+                                "연도": year_str,
+                                "월": f"{int(month_str)}월" if month_str.isdigit() else month_str,
+                                "채널": ch_name,
+                                "매출(억원)": sales_val,
+                                "구분": "지상파"
+                            })
 
-                # 종합/유선/CJ ENM 등 케이블 및 미디어 섹션
+                # 2) 종합/유선/CJ ENM 등 케이블 및 미디어 섹션
                 if any(k in row_text for k in ["종합/유선채널", "유선채널", "케이블", "종편"]):
                     for offset in range(1, 25):
                         if i + offset >= len(df): break
-                        sub_row = df.iloc[i + offset].dropna().tolist()
-                        if len(sub_row) >= 2:
-                            ch_name = str(sub_row[0]).strip()
-                            if not ch_name or any(x in ch_name for x in ["구분", "채널", "매출", "합계", "Total", "소계", "순위"]):
-                                continue
-                            try:
-                                val = float(str(sub_row[1]).replace(',', '').strip())
-                                tv_sales_list.append({
-                                    "연월": ym,
-                                    "연도": year_str,
-                                    "월": f"{int(month_str)}월" if month_str.isdigit() else month_str,
-                                    "채널": ch_name,
-                                    "매출(억원)": val,
-                                    "구분": "종편/유선/PP"
-                                })
-                            except: pass
+                        sub_row = df.iloc[i + offset].tolist()
+                        
+                        ch_name = ""
+                        sales_val = None
+                        
+                        for item in sub_row:
+                            if pd.notna(item):
+                                it_str = str(item).strip()
+                                if not ch_name and not re.match(r'^-?\d+(\.\d+)?$', it_str.replace(',', '')):
+                                    if not any(ign in it_str for ign in ["구분", "채널", "매출", "합계", "소계", "순위", "종편", "유선", "Total"]):
+                                        ch_name = it_str
+                                elif sales_val is None:
+                                    try:
+                                        sales_val = float(it_str.replace(',', ''))
+                                    except:
+                                        pass
+                        
+                        if ch_name and sales_val is not None and sales_val > 0:
+                            tv_sales_list.append({
+                                "연월": ym,
+                                "연도": year_str,
+                                "월": f"{int(month_str)}월" if month_str.isdigit() else month_str,
+                                "채널": ch_name,
+                                "매출(억원)": sales_val,
+                                "구분": "종편/유선/PP"
+                            })
         except Exception as e:
             st.error(f"{f} 파싱 오류: {e}")
             
@@ -436,7 +477,7 @@ if not st.session_state["logged_in"]:
                     st.success("🎉 회원가입 신청이 완료되었습니다! 관리자 승인 후 로그인하실 수 있습니다.")
     st.stop()
 
-# --- 4. 로그인 성공 후 메인 화면 ---
+# --- 4. 로그인 성공 후 공통 제어판 ---
 df_issues, df_tv, df_pt, df_agency, loaded_files = load_all_data()
 df_pt_unique = df_pt.drop_duplicates(subset=["PT일자", "광고주", "품목"]) if not df_pt.empty else pd.DataFrame()
 
@@ -465,6 +506,7 @@ if st.sidebar.button("로그아웃"):
     st.session_state["role"] = None
     st.session_state["user_name"] = None
     st.session_state["login_time"] = None
+    st.session_state["admin_view"] = False
     st.query_params.clear()
     st.rerun()
 
@@ -519,11 +561,22 @@ if not api_key:
 else:
     st.sidebar.caption("🤖 Gemini AI 연동 활성화됨")
 
-# 마스터 전용 메뉴
+# 마스터 전용 사이드바 메뉴
 if st.session_state["role"] == "admin":
     st.sidebar.markdown("---")
     st.sidebar.subheader("👑 마스터 전용 메뉴")
     
+    # [회원 관리] 별도 페이지 이동 버튼
+    if not st.session_state.get("admin_view", False):
+        if st.sidebar.button("👥 [회원 관리]", type="primary", use_container_width=True):
+            st.session_state["admin_view"] = True
+            st.rerun()
+    else:
+        if st.sidebar.button("📊 [메인 대시보드 복귀]", type="secondary", use_container_width=True):
+            st.session_state["admin_view"] = False
+            st.rerun()
+            
+    # 신규 엑셀 업로드
     new_file = st.sidebar.file_uploader("월간 엑셀 추가 (.xlsx)", type=["xlsx"])
     if new_file is not None:
         save_path = os.path.join(DATA_DIR, new_file.name)
@@ -533,51 +586,132 @@ if st.session_state["role"] == "admin":
         log_activity(st.session_state["username"], st.session_state["user_name"], "엑셀 업로드", f"파일: {new_file.name}")
         st.cache_data.clear()
         st.rerun()
-        
-    with st.sidebar.expander("👥 회원 승인 관리", expanded=False):
-        current_users = load_users()
-        pending_users = {uid: info for uid, info in current_users.items() if not info.get("approved", False)}
-        
-        if pending_users:
-            st.write(f"승인 대기자: **{len(pending_users)}명**")
-            for uid, info in pending_users.items():
-                st.write(f"- {info.get('name', uid)} (`{uid}`)")
-                col_app, col_del = st.columns(2)
-                if col_app.button("승인", key=f"app_{uid}"):
-                    current_users[uid]["approved"] = True
-                    save_users(current_users)
-                    log_activity(st.session_state["username"], st.session_state["user_name"], "회원 승인", f"승인 대상: {uid}")
-                    st.rerun()
-                if col_del.button("반려", key=f"del_{uid}"):
-                    del current_users[uid]
-                    save_users(current_users)
-                    log_activity(st.session_state["username"], st.session_state["user_name"], "회원 반려", f"반려 대상: {uid}")
-                    st.rerun()
-        else:
-            st.caption("대기 중인 승인 요청이 없습니다.")
-
-    with st.sidebar.expander("📋 회원 방문/활동 로그", expanded=False):
-        df_logs = load_activity_logs()
-        if not df_logs.empty:
-            st.caption(f"총 누적 로그: {len(df_logs)}건")
-            user_filter = st.selectbox("사용자별 필터", ["전체"] + sorted(df_logs["아이디"].unique().tolist()))
-            if user_filter != "전체":
-                view_logs = df_logs[df_logs["아이디"] == user_filter]
-            else:
-                view_logs = df_logs
-            st.dataframe(view_logs, hide_index=True, width="stretch")
-            
-            if st.button("로그 비우기", type="secondary"):
-                if os.path.exists(LOG_DB_FILE):
-                    os.remove(LOG_DB_FILE)
-                st.rerun()
-        else:
-            st.caption("기록된 활동 로그가 없습니다.")
 
 st.sidebar.markdown("---")
 st.sidebar.write(f"📁 적재 완료 파일: **{len(loaded_files)}건**")
 
-# 대시보드 타이틀
+# =========================================================================
+# 5. [관리자 전용 페이지] 회원 관리 및 활동 로그 (admin_view == True 일 때)
+# =========================================================================
+if st.session_state["role"] == "admin" and st.session_state.get("admin_view", False):
+    c_head1, c_head2 = st.columns([4, 1])
+    with c_head1:
+        st.title("👥 관리자 전용 회원 및 활동 관리 센터")
+        st.caption("가입 회원 리스트 승인/권한 관리 및 접속·활동 감사 로그를 한눈에 모니터링합니다.")
+    with c_head2:
+        st.write("")
+        if st.button("⬅️ 메인 대시보드로 돌아가기", type="primary", use_container_width=True):
+            st.session_state["admin_view"] = False
+            st.rerun()
+
+    st.markdown("---")
+    
+    admin_tab1, admin_tab2 = st.tabs(["📋 가입 회원 리스트 및 승인 관리", "🔍 회원 방문 및 활동 감사 로그"])
+    
+    # 탭 A: 가입 회원 리스트
+    with admin_tab1:
+        all_users = load_users()
+        user_list_data = []
+        pending_count = 0
+        
+        for u_id, info in all_users.items():
+            is_app = info.get("approved", False)
+            if not is_app:
+                pending_count += 1
+            user_list_data.append({
+                "아이디": u_id,
+                "이름": info.get("name", u_id),
+                "권한": "관리자(admin)" if info.get("role") == "admin" else "일반회원(member)",
+                "승인상태": "✅ 승인 완료" if is_app else "⏳ 승인 대기"
+            })
+            
+        df_user_summary = pd.DataFrame(user_list_data)
+        
+        u_m1, u_m2, u_m3 = st.columns(3)
+        u_m1.metric("총 등록 계정", f"{len(df_user_summary)}명")
+        u_m2.metric("정상 승인 회원", f"{len(df_user_summary) - pending_count}명")
+        u_m3.metric("승인 대기 중", f"{pending_count}명")
+        
+        st.markdown("---")
+        
+        # 대기 중인 회원 승인/반려
+        pending_users_dict = {uid: info for uid, info in all_users.items() if not info.get("approved", False)}
+        if pending_users_dict:
+            st.subheader(f"⏳ 신규 승인 대기 목록 ({len(pending_users_dict)}명)")
+            for uid, info in pending_users_dict.items():
+                p_col1, p_col2, p_col3 = st.columns([3, 1, 1])
+                with p_col1:
+                    st.markdown(f"👤 **{info.get('name', uid)}** (아이디: `{uid}`)")
+                with p_col2:
+                    if st.button("승인하기", key=f"p_app_{uid}", type="primary"):
+                        all_users[uid]["approved"] = True
+                        save_users(all_users)
+                        log_activity(st.session_state["username"], st.session_state["user_name"], "회원 승인", f"승인: {uid}")
+                        st.success(f"{uid} 회원 승인 완료")
+                        st.rerun()
+                with p_col3:
+                    if st.button("반려/삭제", key=f"p_del_{uid}"):
+                        del all_users[uid]
+                        save_users(all_users)
+                        log_activity(st.session_state["username"], st.session_state["user_name"], "회원 반려", f"반려: {uid}")
+                        st.warning(f"{uid} 회원 신청 반려됨")
+                        st.rerun()
+            st.markdown("---")
+            
+        st.subheader("👥 전체 가입 회원 목록")
+        st.dataframe(df_user_summary, use_container_width=True, hide_index=True)
+        
+        with st.expander("⚠️ 회원 계정 강제 탈퇴 / 삭제 관리"):
+            delete_target = st.selectbox(
+                "삭제할 회원 아이디 선택", 
+                [uid for uid in all_users.keys() if uid != "admin" and uid != st.session_state["username"]]
+            )
+            if st.button(f"'{delete_target}' 계정 영구 삭제", type="secondary"):
+                if delete_target in all_users:
+                    del all_users[delete_target]
+                    save_users(all_users)
+                    log_activity(st.session_state["username"], st.session_state["user_name"], "회원 삭제", f"삭제 대상: {delete_target}")
+                    st.success(f"'{delete_target}' 회원이 성공적으로 삭제되었습니다.")
+                    st.rerun()
+
+    # 탭 B: 회원 활동 감사 로그
+    with admin_tab2:
+        st.subheader("🔍 회원 방문 및 활동 실시간 로그")
+        df_logs = load_activity_logs()
+        
+        if not df_logs.empty:
+            l_col1, l_col2, l_col3 = st.columns([2, 2, 2])
+            with l_col1:
+                user_list_for_log = ["전체 회원"] + sorted(df_logs["아이디"].unique().tolist())
+                selected_log_user = st.selectbox("회원별 필터링", user_list_for_log)
+            with l_col2:
+                action_types = ["전체 활동"] + sorted(df_logs["활동 구분"].unique().tolist())
+                selected_action = st.selectbox("활동 유형별 필터링", action_types)
+            with l_col3:
+                st.write("")
+                st.write("")
+                if st.button("🗑️ 감사 로그 전체 초기화", type="secondary"):
+                    if os.path.exists(LOG_DB_FILE):
+                        os.remove(LOG_DB_FILE)
+                    st.success("활동 로그가 초기화되었습니다.")
+                    st.rerun()
+
+            view_logs = df_logs.copy()
+            if selected_log_user != "전체 회원":
+                view_logs = view_logs[view_logs["아이디"] == selected_log_user]
+            if selected_action != "전체 활동":
+                view_logs = view_logs[view_logs["활동 구분"] == selected_action]
+
+            st.caption(f"조회된 로그: **{len(view_logs)}건** / 총 보관 로그: **{len(df_logs)}건**")
+            st.dataframe(view_logs, use_container_width=True, hide_index=True)
+        else:
+            st.info("아직 기록된 회원 활동 로그가 없습니다.")
+
+    st.stop()
+
+# =========================================================================
+# 6. [일반 메인 대시보드 화면]
+# =========================================================================
 st.title("📊 월간 미디어·광고 업계 동향 대시보드")
 st.caption("2021년 9월 이후 축적된 월간 동향 보고서를 다각도로 분석·조회하는 통합 인텔리전스 시스템")
 
@@ -640,17 +774,17 @@ if global_query:
             st.dataframe(
                 matched_pt[["발행연월", "PT일자", "광고주", "품목", "빌링_원문", "참여사", "선정사", "메모"]].rename(columns={"빌링_원문": "빌링(억원)"}),
                 hide_index=True,
-                width="stretch"
+                use_container_width=True
             )
 
     if len(matched_agency) > 0 or len(matched_tv) > 0:
         with st.expander(f"🏢 대행사 / 매체사 관련 검색 결과 ({len(matched_agency) + len(matched_tv)}건)", expanded=False):
             if len(matched_agency) > 0:
                 st.caption("🏆 **대행사 매출 데이터**")
-                st.dataframe(matched_agency[["연월", "대행사", "매출(억원)"]], hide_index=True, width="stretch")
+                st.dataframe(matched_agency[["연월", "대행사", "매출(억원)"]], hide_index=True, use_container_width=True)
             if len(matched_tv) > 0:
                 st.caption("📺 **방송 매체사 매출 데이터**")
-                st.dataframe(matched_tv[["연월", "구분", "채널", "매출(억원)"]], hide_index=True, width="stretch")
+                st.dataframe(matched_tv[["연월", "구분", "채널", "매출(억원)"]], hide_index=True, use_container_width=True)
 
     if tot_cnt == 0:
         st.warning(f"'{global_query}'에 대한 검색 결과가 업로드된 모든 자료에 없습니다.")
@@ -701,7 +835,7 @@ with tab1:
 
         st.dataframe(
             view_pt[["PT일자", "광고주", "품목", "빌링_원문", "참여사", "기존사", "선정사", "메모"]].rename(columns={"빌링_원문": "빌링(억원)"}),
-            width="stretch",
+            use_container_width=True,
             hide_index=True
         )
     else:
@@ -720,6 +854,7 @@ with tab2:
     
     col_l, col_r = st.columns(2)
     
+    # [좌측] 순수 광고대행사 영역
     with col_l:
         st.markdown("#### 🏆 주요 광고대행사 전파광고 매출")
         if not df_agency.empty:
@@ -747,7 +882,7 @@ with tab2:
                     text_auto=True,
                     title=f"[{selected_single_agency}] 매출 추이 ({selected_ag_year})"
                 )
-                st.plotly_chart(fig_ag, width="stretch")
+                st.plotly_chart(fig_ag, use_container_width=True)
 
             if view_mode in ["📋 상세 매출표 보기", "📊+📋 둘 다 보기"]:
                 pivot_ag = df_view_ag.pivot_table(
@@ -757,7 +892,7 @@ with tab2:
                     aggfunc="sum",
                     fill_value=0
                 )
-                st.dataframe(pivot_ag, width="stretch")
+                st.dataframe(pivot_ag, use_container_width=True)
 
             with st.expander(f"📈 {selected_single_agency} YoY (전년 동월 대비) 비교 분석", expanded=False):
                 if len(agency_years) >= 2:
@@ -789,8 +924,8 @@ with tab2:
                             barmode="group",
                             title=f"{prev_year}년 vs {yoy_base_year}년 월별 매출 비교"
                         )
-                        st.plotly_chart(fig_yoy_ag, width="stretch")
-                        st.dataframe(df_yoy_ag, hide_index=True, width="stretch")
+                        st.plotly_chart(fig_yoy_ag, use_container_width=True)
+                        st.dataframe(df_yoy_ag, hide_index=True, use_container_width=True)
                     else:
                         st.info(f"{prev_year}년 또는 {yoy_base_year}년 데이터가 부족하여 YoY 비교표를 구성할 수 없습니다.")
                 else:
@@ -798,6 +933,7 @@ with tab2:
         else:
             st.info("대행사 매출 집계 중")
 
+    # [우측] 방송/매체사 영역
     with col_r:
         st.markdown("#### 📺 방송 매체사 광고 매출")
         if not df_tv.empty:
@@ -826,7 +962,7 @@ with tab2:
                     markers=True,
                     title=f"[{selected_single_tv}] 매출 추이 ({selected_tv_year})"
                 )
-                st.plotly_chart(fig_tv, width="stretch")
+                st.plotly_chart(fig_tv, use_container_width=True)
 
             if view_mode in ["📋 상세 매출표 보기", "📊+📋 둘 다 보기"]:
                 pivot_tv = df_view_tv.pivot_table(
@@ -836,7 +972,7 @@ with tab2:
                     aggfunc="sum",
                     fill_value=0
                 )
-                st.dataframe(pivot_tv, width="stretch")
+                st.dataframe(pivot_tv, use_container_width=True)
 
             with st.expander(f"📈 {selected_single_tv} YoY (전년 동월 대비) 비교 분석", expanded=False):
                 if len(tv_years) >= 2:
@@ -868,8 +1004,8 @@ with tab2:
                             barmode="group",
                             title=f"{prev_tv_year}년 vs {yoy_tv_base}년 월별 매출 비교"
                         )
-                        st.plotly_chart(fig_yoy_tv, width="stretch")
-                        st.dataframe(df_yoy_tv, hide_index=True, width="stretch")
+                        st.plotly_chart(fig_yoy_tv, use_container_width=True)
+                        st.dataframe(df_yoy_tv, hide_index=True, use_container_width=True)
                     else:
                         st.info(f"{prev_tv_year}년 또는 {yoy_tv_base}년 데이터가 부족하여 YoY 비교표를 구성할 수 없습니다.")
                 else:
