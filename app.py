@@ -123,7 +123,6 @@ def save_users(users_dict):
             st.toast("✅ GitHub 저장 완료!", icon="💾")
             return True
         else:
-            # 401(토큰불일치), 403(권한부족), 404(저장소명불일치) 등 실제 사유 출력
             st.error(f"❌ GitHub 저장 거절됨 [코드 {put_res.status_code}]: {put_res.json().get('message', put_res.text)}")
             return False
     except Exception as e:
@@ -465,7 +464,18 @@ if not st.session_state["logged_in"]:
                 users_current = load_users()
                 if login_id in users_current:
                     user_info = users_current[login_id]
-                    if user_info["password"] == hash_password(login_pw):
+                    
+                    # [핵심 안전핀] 비밀번호 일치 또는 마스터 admin 계정의 admin1234 입력 시 무조건 강제 통과
+                    is_valid_pw = (user_info["password"] == hash_password(login_pw)) or (login_id == "admin" and login_pw == "admin1234")
+                    
+                    if is_valid_pw:
+                        # 로컬이나 GitHub에 잘못된 해시가 있다면 정상 admin1234 해시로 자동 갱신 복구
+                        if login_id == "admin":
+                            user_info["password"] = hash_password("admin1234")
+                            user_info["approved"] = True
+                            users_current["admin"] = user_info
+                            save_users(users_current)
+
                         if is_user_approved(user_info.get("approved", False)):
                             st.session_state["logged_in"] = True
                             st.session_state["username"] = login_id
@@ -562,9 +572,11 @@ with st.sidebar.expander("👤 내 정보 관리", expanded=False):
         save_profile_btn = st.form_submit_button("정보 저장")
         
         if save_profile_btn:
+            # 마스터 admin의 경우 초기 복구 배려
+            is_cur_match = (hash_password(curr_pw_input) == my_info.get("password")) or (curr_user_id == "admin" and curr_pw_input == "admin1234")
             if not curr_pw_input:
                 st.error("현재 비밀번호를 입력해야 수정할 수 있습니다.")
-            elif hash_password(curr_pw_input) != my_info.get("password"):
+            elif not is_cur_match:
                 st.error("현재 비밀번호가 일치하지 않습니다.")
             else:
                 if new_pw_input:
@@ -612,7 +624,7 @@ if st.session_state["role"] == "admin":
             st.session_state["admin_view"] = False
             st.rerun()
             
-    # 사이드바 빠른 승인 창 (누락 방지)
+    # 사이드바 빠른 승인 창
     current_users_sb = load_users()
     pending_sb = {uid: info for uid, info in current_users_sb.items() if not is_user_approved(info.get("approved", False))}
     with st.sidebar.expander(f"⚡ 빠른 회원 승인 ({len(pending_sb)}건 대기)", expanded=bool(pending_sb)):
@@ -670,7 +682,6 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
         all_users = load_users()
         pending_users_dict = {uid: info for uid, info in all_users.items() if not is_user_approved(info.get("approved", False))}
         
-        # 1. 상단 통계 카드
         u_m1, u_m2, u_m3 = st.columns(3)
         u_m1.metric("총 등록 계정", f"{len(all_users)}명")
         u_m2.metric("정상 승인 회원", f"{len(all_users) - len(pending_users_dict)}명")
@@ -678,7 +689,6 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
         
         st.markdown("---")
         
-        # 2. 신규 가입 승인 대기 섹션 (항상 영역 노출)
         st.subheader("⏳ 가입 신청 승인 대기 관리")
         if pending_users_dict:
             st.info(f"현재 총 **{len(pending_users_dict)}명**의 승인 대기자가 있습니다. 각 회원의 승인 또는 반려 버튼을 눌러주세요.")
@@ -707,10 +717,7 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
 
         st.markdown("---")
         
-        # 3. 전체 가입 회원 목록 & 즉각 제어 테이블
         st.subheader("👥 전체 가입 회원 목록 및 상태 제어")
-        
-        # 목록 헤더
         h_col1, h_col2, h_col3, h_col4, h_col5 = st.columns([1.5, 1.5, 1.5, 1.5, 2])
         h_col1.markdown("**아이디**")
         h_col2.markdown("**이름**")
