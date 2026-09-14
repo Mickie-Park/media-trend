@@ -3,6 +3,8 @@ import glob
 import re
 import json
 import hashlib
+import base64
+import requests
 from datetime import datetime, timezone, timedelta
 import pandas as pd
 import streamlit as st
@@ -17,19 +19,7 @@ USER_DB_FILE = "users.json"
 LOG_DB_FILE = "activity_logs.json"
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# 한국 표준시(KST) 구하기
-def get_now_kst():
-    kst = timezone(timedelta(hours=9))
-    return datetime.now(kst)
-
-# 비밀번호 암호화 함수
-def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
-
-# 회원 DB 로드 및 저장 (GitHub API 영구 보존 동기화)
-import base64
-import requests
-
+# GitHub API 연동 설정
 GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", None)
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "Mickie-Park/media-trend")
 FILE_PATH = "users.json"
@@ -40,6 +30,16 @@ def get_github_headers():
         "Accept": "application/vnd.github.v3+json"
     }
 
+# 한국 표준시(KST) 구하기
+def get_now_kst():
+    kst = timezone(timedelta(hours=9))
+    return datetime.now(kst)
+
+# 비밀번호 암호화 함수
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+# 회원 DB 로드 (GitHub API 연동 및 안전 Fallback)
 def load_users():
     default_admin = {
         "admin": {
@@ -50,7 +50,6 @@ def load_users():
         }
     }
     
-    # GITHUB_TOKEN이 아직 설정되지 않았거나 없을 경우 로컬 파일 확인
     if not GITHUB_TOKEN:
         if os.path.exists(USER_DB_FILE):
             try:
@@ -59,11 +58,9 @@ def load_users():
                     if u: return u
             except Exception:
                 pass
-        # 로컬 파일도 없으면 기본 admin 생성
         save_users(default_admin)
         return default_admin
             
-    # GitHub API로 원격 users.json 조회
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{FILE_PATH}"
     try:
         res = requests.get(url, headers=get_github_headers())
@@ -78,10 +75,10 @@ def load_users():
     except Exception:
         pass
 
-    # GitHub에 아직 users.json이 없거나 실패한 경우 즉시 기본 admin 생성 및 GitHub에 저장
     save_users(default_admin)
     return default_admin
 
+# 회원 DB 저장 (GitHub API 영구 동기화)
 def save_users(users_dict):
     with open(USER_DB_FILE, "w", encoding="utf-8") as f:
         json.dump(users_dict, f, ensure_ascii=False, indent=4)
@@ -109,6 +106,59 @@ def save_users(users_dict):
     except Exception:
         pass
 
+# 활동 로그 기록 함수 (최근 1,000건 보관)
+def log_activity(username, user_name, action, details=""):
+    now = get_now_kst()
+    timestamp_str = now.strftime("%Y-%m-%d %H:%M:%S")
+    
+    logs = []
+    if os.path.exists(LOG_DB_FILE):
+        try:
+            with open(LOG_DB_FILE, "r", encoding="utf-8") as f:
+                logs = json.load(f)
+        except Exception:
+            logs = []
+            
+    logs.append({
+        "timestamp": timestamp_str,
+        "username": username,
+        "name": user_name,
+        "action": action,
+        "details": details
+    })
+    
+    if len(logs) > 1000:
+        logs = logs[-1000:]
+        
+    try:
+        with open(LOG_DB_FILE, "w", encoding="utf-8") as f:
+            json.dump(logs, f, ensure_ascii=False, indent=4)
+    except Exception:
+        pass
+
+# 활동 로그 불러오기 함수
+def load_activity_logs():
+    if not os.path.exists(LOG_DB_FILE):
+        return pd.DataFrame(columns=["일시", "아이디", "이름", "활동 구분", "상세 내역"])
+    try:
+        with open(LOG_DB_FILE, "r", encoding="utf-8") as f:
+            logs = json.load(f)
+        df_l = pd.DataFrame(logs)
+        if not df_l.empty:
+            df_l = df_l.rename(columns={
+                "timestamp": "일시",
+                "username": "아이디",
+                "name": "이름",
+                "action": "활동 구분",
+                "details": "상세 내역"
+            })
+            return df_l.sort_values(by="일시", ascending=False)
+        return pd.DataFrame(columns=["일시", "아이디", "이름", "활동 구분", "상세 내역"])
+    except Exception:
+        return pd.DataFrame(columns=["일시", "아이디", "이름", "활동 구분", "상세 내역"])
+
+users_db = load_users()
+
 # --- 세션 상태 초기화 및 새로고침(F5) 유지 처리 ---
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
@@ -128,7 +178,7 @@ if auth_token and not st.session_state["logged_in"]:
         st.session_state["user_name"] = users_current[auth_token].get("name", auth_token)
         st.session_state["login_time"] = get_now_kst()
 
-# --- 2. 엑셀 데이터 파싱 함수 ---
+# --- 2. 엑셀 데이터 파싱 함수 (전수 파싱 및 필터 보정) ---
 @st.cache_data
 def load_all_data():
     raw_files = glob.glob("**/*.[xX][lL][sS][xX]", recursive=True)
@@ -208,7 +258,7 @@ def load_all_data():
 
                         date_str = pt_date.strftime("%Y-%m-%d") if isinstance(pt_date, pd.Timestamp) else date_raw_str
                         
-                        # 연도 추출 (일자 텍스트 또는 발행연월 기반)
+                        # 연도 추출
                         pt_year = year_str
                         ymatch = re.search(r'(\d{4})', date_str)
                         if ymatch:
@@ -245,13 +295,11 @@ def load_all_data():
                         agency_row = df.iloc[i + offset].tolist()
                         name_candidate = str(agency_row[0]).strip() if pd.notna(agency_row[0]) else ""
                         
-                        # 불필요한 헤더/합계/빈값 제외
                         if not name_candidate or name_candidate in ["nan", "대행사", "광고회사", "회사명", "구분"]:
                             continue
                         if any(x in name_candidate for x in ["전파광고", "매출액", "순위", "합계", "Total", "소계"]):
                             continue
                         
-                        # 1번째 또는 2번째 열에서 매출 숫자 추출
                         val = None
                         for col_idx in [1, 2]:
                             if len(agency_row) > col_idx and pd.notna(agency_row[col_idx]):
@@ -271,7 +319,7 @@ def load_all_data():
                                 "매출(억원)": val
                             })
 
-            # D. 방송/미디어 매체사 매출 (CJ ENM, 지상파, 종편, 케이블 전수 수집)
+            # D. 방송/미디어 매체사 매출 (CJ ENM 등 전수 수집)
             for i in range(len(df)):
                 row_vals = [str(x) for x in df.iloc[i].dropna().tolist()]
                 row_text = " ".join(row_vals)
@@ -392,7 +440,6 @@ if not st.session_state["logged_in"]:
 df_issues, df_tv, df_pt, df_agency, loaded_files = load_all_data()
 df_pt_unique = df_pt.drop_duplicates(subset=["PT일자", "광고주", "품목"]) if not df_pt.empty else pd.DataFrame()
 
-# 체류 시간 계산 문자열
 def get_stay_duration_str():
     if st.session_state.get("login_time"):
         delta = get_now_kst() - st.session_state["login_time"]
@@ -421,7 +468,7 @@ if st.sidebar.button("로그아웃"):
     st.query_params.clear()
     st.rerun()
 
-# --- 내 정보 관리 ---
+# 내 정보 관리
 with st.sidebar.expander("👤 내 정보 관리", expanded=False):
     with st.form("edit_profile_form"):
         curr_user_id = st.session_state["username"]
@@ -465,19 +512,18 @@ with st.sidebar.expander("👤 내 정보 관리", expanded=False):
 
 st.sidebar.markdown("---")
 
-# Secrets 자동 연동 처리
+# Secrets 연동
 api_key = st.secrets.get("GEMINI_API_KEY", None)
 if not api_key:
     api_key = st.sidebar.text_input("🔑 Gemini API Key (선택)", type="password", help="API 키를 입력하면 AI 탭이 활성화됩니다.")
 else:
     st.sidebar.caption("🤖 Gemini AI 연동 활성화됨")
 
-# --- 마스터 전용 관리 기능 ---
+# 마스터 전용 메뉴
 if st.session_state["role"] == "admin":
     st.sidebar.markdown("---")
     st.sidebar.subheader("👑 마스터 전용 메뉴")
     
-    # 신규 엑셀 업로드
     new_file = st.sidebar.file_uploader("월간 엑셀 추가 (.xlsx)", type=["xlsx"])
     if new_file is not None:
         save_path = os.path.join(DATA_DIR, new_file.name)
@@ -488,7 +534,6 @@ if st.session_state["role"] == "admin":
         st.cache_data.clear()
         st.rerun()
         
-    # 회원 승인 관리 창
     with st.sidebar.expander("👥 회원 승인 관리", expanded=False):
         current_users = load_users()
         pending_users = {uid: info for uid, info in current_users.items() if not info.get("approved", False)}
@@ -511,7 +556,6 @@ if st.session_state["role"] == "admin":
         else:
             st.caption("대기 중인 승인 요청이 없습니다.")
 
-    # 회원별 방문 및 활동 감사 로그
     with st.sidebar.expander("📋 회원 방문/활동 로그", expanded=False):
         df_logs = load_activity_logs()
         if not df_logs.empty:
@@ -533,13 +577,11 @@ if st.session_state["role"] == "admin":
 st.sidebar.markdown("---")
 st.sidebar.write(f"📁 적재 완료 파일: **{len(loaded_files)}건**")
 
-# 대시보드 메인 헤더
+# 대시보드 타이틀
 st.title("📊 월간 미디어·광고 업계 동향 대시보드")
 st.caption("2021년 9월 이후 축적된 월간 동향 보고서를 다각도로 분석·조회하는 통합 인텔리전스 시스템")
 
-# ==========================================
-# 🔍 메인 화면 전 카테고리 실시간 통합 검색 영역
-# ==========================================
+# 🔍 실시간 통합 검색 영역
 st.markdown("### 🔍 업계 동향 전 카테고리 통합 검색")
 global_query = st.text_input(
     "키워드를 입력하면 모든 엑셀 데이터(이슈, PT, 매출/매체사)에서 실시간으로 찾아냅니다.",
@@ -615,9 +657,7 @@ if global_query:
     
     st.markdown("---")
 
-# ==========================================
 # 4개 메인 탭 영역
-# ==========================================
 tab1, tab2, tab3, tab4 = st.tabs([
     "🎯 광고회사 PT 수주 현황", 
     "🏢 대행사/매체사 매출 동향", 
@@ -625,13 +665,10 @@ tab1, tab2, tab3, tab4 = st.tabs([
     "🤖 AI 동향 분석가"
 ])
 
-# -------------------------------------------------------------
-# 탭 1: PT 수주 현황 (연도 선택 필터 적용)
-# -------------------------------------------------------------
+# 탭 1: PT 수주 현황
 with tab1:
     st.subheader("🎯 광고회사 경쟁 PT 모니터링 & 수주 분석")
     if not df_pt_unique.empty:
-        # 1. 연도 선택 필터
         available_years = sorted(list(set([str(y) for y in df_pt_unique["연도"].dropna() if str(y).isdigit()])), reverse=True)
         selected_pt_year = st.selectbox("📅 PT 연도 선택", ["전체 연도"] + available_years)
 
@@ -670,9 +707,7 @@ with tab1:
     else:
         st.warning("PT 데이터가 아직 없습니다.")
 
-# -------------------------------------------------------------
-# 탭 2: 매출 동향 (드롭다운 회사 선택 + 연도 필터 + YoY 비교 분석)
-# -------------------------------------------------------------
+# 탭 2: 매출 동향
 with tab2:
     st.subheader("🏢 광고대행사 및 방송 매체사 매출 추이 & YoY 분석")
     
@@ -685,7 +720,6 @@ with tab2:
     
     col_l, col_r = st.columns(2)
     
-    # [좌측] 주요 광고대행사 영역
     with col_l:
         st.markdown("#### 🏆 주요 광고대행사 전파광고 매출")
         if not df_agency.empty:
@@ -705,7 +739,6 @@ with tab2:
             else:
                 df_view_ag = df_single_ag
 
-            # 그래프
             if view_mode in ["📊 그래프 보기", "📊+📋 둘 다 보기"]:
                 fig_ag = px.bar(
                     df_view_ag, 
@@ -716,7 +749,6 @@ with tab2:
                 )
                 st.plotly_chart(fig_ag, width="stretch")
 
-            # 상세 매출표
             if view_mode in ["📋 상세 매출표 보기", "📊+📋 둘 다 보기"]:
                 pivot_ag = df_view_ag.pivot_table(
                     index="대행사", 
@@ -727,7 +759,6 @@ with tab2:
                 )
                 st.dataframe(pivot_ag, width="stretch")
 
-            # YoY 전년 동월 대비 분석 Expander
             with st.expander(f"📈 {selected_single_agency} YoY (전년 동월 대비) 비교 분석", expanded=False):
                 if len(agency_years) >= 2:
                     yoy_base_year = st.selectbox("기준 연도(당해)", agency_years, index=0, key="yoy_ag_base")
@@ -739,7 +770,6 @@ with tab2:
                     if not df_curr.empty and not df_prev.empty:
                         df_yoy_ag = pd.merge(df_prev, df_curr, on="월", how="outer").fillna(0)
                         
-                        # 월 순서 정렬
                         def month_sort_key(m):
                             digits = re.findall(r'\d+', str(m))
                             return int(digits[0]) if digits else 99
@@ -752,7 +782,6 @@ with tab2:
                             if r[f"{prev_year}년"] > 0 else "-", axis=1
                         )
                         
-                        # YoY 비교 차트
                         fig_yoy_ag = px.bar(
                             df_yoy_ag, 
                             x="월", 
@@ -769,7 +798,6 @@ with tab2:
         else:
             st.info("대행사 매출 집계 중")
 
-    # [우측] 방송 매체사 영역
     with col_r:
         st.markdown("#### 📺 방송 매체사 광고 매출")
         if not df_tv.empty:
@@ -790,7 +818,6 @@ with tab2:
             else:
                 df_view_tv = df_single_tv
 
-            # 그래프
             if view_mode in ["📊 그래프 보기", "📊+📋 둘 다 보기"]:
                 fig_tv = px.line(
                     df_view_tv, 
@@ -801,7 +828,6 @@ with tab2:
                 )
                 st.plotly_chart(fig_tv, width="stretch")
 
-            # 상세 매출표
             if view_mode in ["📋 상세 매출표 보기", "📊+📋 둘 다 보기"]:
                 pivot_tv = df_view_tv.pivot_table(
                     index="채널", 
@@ -812,7 +838,6 @@ with tab2:
                 )
                 st.dataframe(pivot_tv, width="stretch")
 
-            # YoY 전년 동월 대비 분석 Expander
             with st.expander(f"📈 {selected_single_tv} YoY (전년 동월 대비) 비교 분석", expanded=False):
                 if len(tv_years) >= 2:
                     yoy_tv_base = st.selectbox("기준 연도(당해)", tv_years, index=0, key="yoy_tv_base")
@@ -852,9 +877,7 @@ with tab2:
         else:
             st.info("방송사 매출 집계 중")
 
-# -------------------------------------------------------------
 # 탭 3: 이슈 브리핑
-# -------------------------------------------------------------
 with tab3:
     st.subheader("📰 월별 업계 이슈 & 정책 동향")
     if not df_issues.empty:
@@ -868,9 +891,7 @@ with tab3:
     else:
         st.warning("이슈 데이터가 없습니다.")
 
-# -------------------------------------------------------------
 # 탭 4: AI 동향 분석가
-# -------------------------------------------------------------
 with tab4:
     st.subheader("🤖 AI 기반 업계 동향 분석가")
     if not api_key:
