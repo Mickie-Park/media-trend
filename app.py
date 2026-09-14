@@ -179,7 +179,7 @@ if auth_token and not st.session_state["logged_in"]:
         st.session_state["user_name"] = users_current[auth_token].get("name", auth_token)
         st.session_state["login_time"] = get_now_kst()
 
-# --- 2. 엑셀 데이터 파싱 함수 (오류 수정 및 정밀 분리) ---
+# --- 2. 엑셀 데이터 파싱 함수 (매체사 표준화 및 문법 구조 완전 복구) ---
 @st.cache_data
 def load_all_data():
     raw_files = glob.glob("**/*.[xX][lL][sS][xX]", recursive=True)
@@ -198,6 +198,35 @@ def load_all_data():
     pt_list = []
     agency_sales_list = []
     
+    # 공인 방송/매체사 키워드 표준화 사전
+    KNOWN_MEDIA_DICT = {
+        "KBS": "KBS",
+        "MBC": "MBC",
+        "SBS": "SBS",
+        "CJ ENM": "CJ ENM",
+        "CJ E&M": "CJ ENM",
+        "CJENM": "CJ ENM",
+        "CJE&M": "CJ ENM",
+        "JTBC": "JTBC",
+        "TV CHOSUN": "TV조선",
+        "TV조선": "TV조선",
+        "CHANNEL A": "채널A",
+        "채널A": "채널A",
+        "CHANNELA": "채널A",
+        "MBN": "MBN",
+        "YTN": "YTN",
+        "연합뉴스": "연합뉴스TV",
+        "연합뉴스TV": "연합뉴스TV",
+        "SPOTV": "SPOTV",
+        "SBS PLUS": "SBS Plus",
+        "SBS FUNT": "SBS FunE",
+        "KBS N": "KBS N",
+        "MBC PLUS": "MBC Plus",
+        "E채널": "E채널",
+        "TVN": "tvN",
+        "OCN": "OCN"
+    }
+
     for f in all_files:
         m = re.search(r'(\d{4})(\d{2})', f)
         ym = f"{m.group(1)}-{m.group(2)}" if m else "기타"
@@ -285,7 +314,7 @@ def load_all_data():
                             "메모": str(memo).strip() if pd.notna(memo) else ""
                         })
 
-            # C. 대행사 전파광고 매출 (매체사 유입 방지 및 엄격한 범위 제한)
+            # C. 대행사 전파광고 매출
             for i in range(len(df)):
                 row_str = " ".join([str(x) for x in df.iloc[i].dropna().tolist()])
                 if "광고회사 전파광고" in row_str or "대행사 전파광고" in row_str:
@@ -294,7 +323,6 @@ def load_all_data():
                         agency_row = df.iloc[i + offset].tolist()
                         row_full_text = " ".join([str(x) for x in agency_row if pd.notna(x)])
                         
-                        # 방송/매체사 테이블이 시작되면 대행사 수집 즉시 종료
                         if any(stop_kw in row_full_text for stop_kw in ["지상파 매출", "지상파 광고", "종합/유선채널", "유선채널", "방송사 매출"]):
                             break
 
@@ -302,7 +330,6 @@ def load_all_data():
                         for val_cell in agency_row[:3]:
                             if pd.notna(val_cell):
                                 c_str = str(val_cell).strip()
-                                # 순수 숫자나 특수문자, 불필요 헤더는 회사명이 아님
                                 if c_str and not re.match(r'^\d+(\.\d+)?$', c_str):
                                     if not any(ign in c_str for ign in ["대행사", "광고회사", "회사명", "구분", "순위", "합계", "Total", "소계", "전파광고", "매출"]):
                                         name_candidate = c_str
@@ -311,11 +338,9 @@ def load_all_data():
                         if not name_candidate:
                             continue
 
-                        # 방송사명이 대행사에 섞여 들어가는 것 방지
                         if any(b_name in name_candidate for b_name in ["KBS", "MBC", "SBS", "JTBC", "TV Chosun", "TV조선", "채널A", "Channel A", "MBN", "CJ ENM", "CJ E&M", "SPOTV"]):
                             continue
                         
-                        # 매출 숫자 추출
                         sales_val = None
                         for c_item in agency_row:
                             if pd.notna(c_item):
@@ -337,41 +362,11 @@ def load_all_data():
                                 "매출(억원)": sales_val
                             })
 
-            # D. 방송/미디어 매체사 매출 (전수 표준화 및 잡음 100% 차단 정밀 파싱)
-            # 업계 동향 엑셀에 등장하는 공인 방송/매체사 키워드 사전
-            KNOWN_MEDIA_DICT = {
-                "KBS": "KBS",
-                "MBC": "MBC",
-                "SBS": "SBS",
-                "CJ ENM": "CJ ENM",
-                "CJ E&M": "CJ ENM",
-                "CJENM": "CJ ENM",
-                "CJE&M": "CJ ENM",
-                "JTBC": "JTBC",
-                "TV CHOSUN": "TV조선",
-                "TV조선": "TV조선",
-                "CHANNEL A": "채널A",
-                "채널A": "채널A",
-                "CHANNELA": "채널A",
-                "MBN": "MBN",
-                "YTN": "YTN",
-                "연합뉴스": "연합뉴스TV",
-                "연합뉴스TV": "연합뉴스TV",
-                "SPOTV": "SPOTV",
-                "SBS PLUS": "SBS Plus",
-                "SBS FUNT": "SBS FunE",
-                "KBS N": "KBS N",
-                "MBC PLUS": "MBC Plus",
-                "E채널": "E채널",
-                "TVN": "tvN",
-                "OCN": "OCN"
-            }
-
+            # D. 방송/미디어 매체사 매출 (전수 표준화 매핑)
             for i in range(len(df)):
                 row_vals = [str(x).strip() for x in df.iloc[i].dropna().tolist()]
                 row_text = " ".join(row_vals).upper()
 
-                # 지상파 및 종편/유선/PP 섹션 감지
                 is_terrestrial = any(k in row_text for k in ["지상파 매출", "지상파 광고", "지상파방송"])
                 is_cable = any(k in row_text for k in ["종합/유선채널", "유선채널", "종합편성", "케이블", "CJ ENM", "CJ E&M", "주요 PP"])
 
@@ -383,7 +378,6 @@ def load_all_data():
                         if i + offset >= len(df): break
                         sub_row = df.iloc[i + offset].tolist()
                         
-                        # 행 전체 텍스트 확인 (합계, 소계, 단위 등 제외)
                         sub_row_str = " ".join([str(x) for x in sub_row if pd.notna(x)])
                         if any(ign in sub_row_str for ign in ["합계", "소계", "Total", "TOTAL", "단위:", "전년동기", "증감률"]):
                             continue
@@ -391,7 +385,6 @@ def load_all_data():
                         matched_ch = None
                         sales_val = None
 
-                        # 1) 셀을 순회하며 공인 채널 사전과 매칭
                         for item in sub_row:
                             if pd.notna(item):
                                 it_str = str(item).strip()
@@ -401,19 +394,16 @@ def load_all_data():
                                     for k_name, std_name in KNOWN_MEDIA_DICT.items():
                                         k_clean = k_name.upper().replace(" ", "")
                                         if k_clean in it_upper:
-                                            # "지상파 Total" 등은 제외
                                             if "TOTAL" not in it_upper and "합계" not in it_upper:
                                                 matched_ch = std_name
                                                 break
                         
-                        # 2) 해당 행에서 유효한 매출 금액(숫자) 추출
                         if matched_ch:
                             for item in sub_row:
                                 if pd.notna(item):
                                     it_clean = str(item).replace(',', '').replace(' ', '').strip()
                                     try:
                                         val = float(it_clean)
-                                        # 순위 번호(1~20 정수 단독) 오인식을 방지하기 위해 일반적인 매출 범위 필터링
                                         if val > 0 and val != float(re.sub(r'[^0-9]', '', matched_ch) or -1):
                                             sales_val = val
                                             break
@@ -429,6 +419,8 @@ def load_all_data():
                                 "매출(억원)": sales_val,
                                 "구분": cat_name
                             })
+        except Exception as e:
+            st.error(f"{f} 파싱 오류: {e}")
             
     return pd.DataFrame(issues_list), pd.DataFrame(tv_sales_list), pd.DataFrame(pt_list), pd.DataFrame(agency_sales_list), all_files
 
@@ -629,7 +621,6 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
     
     admin_tab1, admin_tab2 = st.tabs(["📋 가입 회원 리스트 및 승인 관리", "🔍 회원 방문 및 활동 감사 로그"])
     
-    # 탭 A: 가입 회원 리스트
     with admin_tab1:
         all_users = load_users()
         user_list_data = []
@@ -655,7 +646,6 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
         
         st.markdown("---")
         
-        # 대기 중인 회원 승인/반려
         pending_users_dict = {uid: info for uid, info in all_users.items() if not info.get("approved", False)}
         if pending_users_dict:
             st.subheader(f"⏳ 신규 승인 대기 목록 ({len(pending_users_dict)}명)")
@@ -695,7 +685,6 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
                     st.success(f"'{delete_target}' 회원이 성공적으로 삭제되었습니다.")
                     st.rerun()
 
-    # 탭 B: 회원 활동 감사 로그
     with admin_tab2:
         st.subheader("🔍 회원 방문 및 활동 실시간 로그")
         df_logs = load_activity_logs()
@@ -875,7 +864,7 @@ with tab2:
     
     col_l, col_r = st.columns(2)
     
-    # [좌측] 순수 광고대행사 영역
+    # [좌측] 대행사 영역
     with col_l:
         st.markdown("#### 🏆 주요 광고대행사 전파광고 매출")
         if not df_agency.empty:
@@ -954,7 +943,7 @@ with tab2:
         else:
             st.info("대행사 매출 집계 중")
 
-    # [우측] 방송/매체사 영역
+    # [우측] 방송 매체사 영역
     with col_r:
         st.markdown("#### 📺 방송 매체사 광고 매출")
         if not df_tv.empty:
