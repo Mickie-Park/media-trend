@@ -24,7 +24,7 @@ GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", None)
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "Mickie-Park/media-trend")
 FILE_PATH = "users.json"
 
-# --- 2. Option C: 하이엔드 컨설팅 리포트 테마 + 사이드바 UI 버그 완전 박멸 CSS ---
+# --- 2. Option C: 하이엔드 컨설팅 리포트 테마 + 사이드바 완전 복원 CSS ---
 st.markdown("""
 <style>
     /* 1. Inter + Pretendard 글로벌 금융/컨설팅 서체 (콤팩트 스케일) */
@@ -38,7 +38,7 @@ st.markdown("""
         font-size: 0.93rem;
     }
 
-    /* 2. 메인 캔버스: 우아하고 눈이 편안한 웜 오프화이트 */
+    /* 2. 메인 캔버스: 웜 오프화이트 */
     .stApp {
         background-color: #FAF9F6;
         color: #1E293B;
@@ -61,91 +61,50 @@ st.markdown("""
         font-size: 0.76rem !important;
     }
 
-    /* ========================================================= */
-    /* 4. [완전 해결] 사이드바 로그아웃 및 일반 버튼 텍스트 복원 */
-    /* ========================================================= */
-    [data-testid="stSidebar"] .stButton > button,
-    [data-testid="stSidebar"] [data-testid="baseButton-secondary"],
-    [data-testid="stSidebar"] button[kind="secondary"] {
-        background-color: #16243E !important;
-        border: 1px solid #3B82F6 !important;
-        border-radius: 5px !important;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
-    }
-    
-    /* 흰색 배경 및 흰색 글씨 겹침 현상 원천 차단 */
-    [data-testid="stSidebar"] .stButton > button *,
-    [data-testid="stSidebar"] [data-testid="baseButton-secondary"] *,
-    [data-testid="stSidebar"] button[kind="secondary"] * {
-        color: #FFFFFF !important;
-        font-weight: 700 !important;
-        font-size: 0.84rem !important;
-        background: transparent !important;
-        opacity: 1 !important;
-    }
-    
-    [data-testid="stSidebar"] .stButton > button:hover,
-    [data-testid="stSidebar"] [data-testid="baseButton-secondary"]:hover {
+    /* 4. 사이드바 모든 버튼 강제 가독성 확보 (로그아웃, 회원관리, 업로더) */
+    [data-testid="stSidebar"] button {
         background-color: #1E3A8A !important;
+        border: 1px solid #3B82F6 !important;
+        border-radius: 6px !important;
+        color: #FFFFFF !important;
+    }
+    [data-testid="stSidebar"] button:hover {
+        background-color: #2563EB !important;
         border-color: #60A5FA !important;
     }
-
-    /* 사이드바 Primary 버튼 (회원 관리 콘솔 등) */
-    [data-testid="stSidebar"] button[kind="primary"] {
-        background-color: #2563EB !important;
-        border: 1px solid #60A5FA !important;
-        border-radius: 5px !important;
-    }
-    [data-testid="stSidebar"] button[kind="primary"] * {
+    [data-testid="stSidebar"] button * {
         color: #FFFFFF !important;
         font-weight: 700 !important;
-        font-size: 0.84rem !important;
         background: transparent !important;
     }
 
-    /* ========================================================= */
-    /* 5. [완전 해결] 사이드바 파일 업로더(엑셀 추가) 흰 박스 제거 */
-    /* ========================================================= */
+    /* 5. 사이드바 파일 업로더 */
     [data-testid="stSidebar"] [data-testid="stFileUploader"] {
         background-color: transparent !important;
     }
-    
-    /* 드롭존 박스 (파란색 점선 프레임) */
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] section,
-    [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] section {
         background-color: #13213B !important;
         border: 1.5px dashed #3B82F6 !important;
         border-radius: 6px !important;
         padding: 12px !important;
     }
-    
-    /* 드롭존 내부 안내 텍스트 */
-    [data-testid="stSidebar"] [data-testid="stFileUploaderDropzoneInstructions"] *,
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] section span,
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] section small {
-        color: #94A3B8 !important;
-        background: transparent !important;
-        font-size: 0.76rem !important;
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] section button {
+        background-color: #2563EB !important;
+        border: 1px solid #60A5FA !important;
+        color: #FFFFFF !important;
     }
-    
-    /* 업로더 내부 [Browse files] 버튼 복원 */
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] button {
-        background-color: #1E3A8A !important;
-        border: 1px solid #3B82F6 !important;
-        border-radius: 4px !important;
-        padding: 4px 10px !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] button * {
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] section button * {
         color: #FFFFFF !important;
         font-weight: 600 !important;
-        font-size: 0.78rem !important;
         background: transparent !important;
     }
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] button:hover {
-        background-color: #2563EB !important;
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] small,
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] span {
+        color: #94A3B8 !important;
+        background: transparent !important;
     }
 
-    /* 사이드바 내부 아코디언 및 입력창 */
+    /* 6. 사이드바 아코디언 및 입력창 */
     [data-testid="stSidebar"] [data-testid="stExpander"] {
         background-color: #13213B !important;
         border: 1px solid #243656 !important;
@@ -162,9 +121,7 @@ st.markdown("""
         font-size: 0.84rem !important;
     }
 
-    /* ========================================================= */
-    /* 6. 메인 본문 지표 카드 및 탭 (컨설팅 리포트 콤팩트 스타일) */
-    /* ========================================================= */
+    /* 7. 메인 본문 지표 카드 */
     [data-testid="stMetric"] {
         background-color: #FFFFFF;
         padding: 14px 18px;
@@ -187,7 +144,7 @@ st.markdown("""
         letter-spacing: -0.02em;
     }
 
-    /* 탭 스타일 */
+    /* 8. 탭 스타일 */
     .stTabs [data-baseweb="tab-list"] {
         gap: 10px;
         border-bottom: 2px solid #E2E8F0;
@@ -208,7 +165,7 @@ st.markdown("""
         background-color: transparent !important;
     }
 
-    /* 메인 화면 일반 버튼 */
+    /* 9. 메인 본문 버튼 */
     .stApp > div:not([data-testid="stSidebar"]) button[kind="primary"] {
         background-color: #1E3A8A !important;
         border-color: #1E3A8A !important;
@@ -225,7 +182,7 @@ st.markdown("""
         font-size: 0.85rem !important;
     }
 
-    /* 본문 아코디언 및 인풋 */
+    /* 10. 아코디언 및 인풋 */
     .stApp > div:not([data-testid="stSidebar"]) [data-testid="stExpander"] {
         background-color: #FFFFFF;
         border: 1px solid #E2E8F0 !important;
