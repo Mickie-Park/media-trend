@@ -41,49 +41,46 @@ def get_github_headers():
     }
 
 def load_users():
+    default_admin = {
+        "admin": {
+            "name": "마스터 관리자",
+            "password": hash_password("admin1234"),
+            "role": "admin",
+            "approved": True
+        }
+    }
+    
+    # GITHUB_TOKEN이 아직 설정되지 않았거나 없을 경우 로컬 파일 확인
     if not GITHUB_TOKEN:
-        if not os.path.exists(USER_DB_FILE):
-            default_users = {
-                "admin": {
-                    "name": "마스터 관리자",
-                    "password": hash_password("admin1234"),
-                    "role": "admin",
-                    "approved": True
-                }
-            }
-            with open(USER_DB_FILE, "w", encoding="utf-8") as f:
-                json.dump(default_users, f, ensure_ascii=False, indent=4)
-            return default_users
-        try:
-            with open(USER_DB_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return {}
+        if os.path.exists(USER_DB_FILE):
+            try:
+                with open(USER_DB_FILE, "r", encoding="utf-8") as f:
+                    u = json.load(f)
+                    if u: return u
+            except Exception:
+                pass
+        # 로컬 파일도 없으면 기본 admin 생성
+        save_users(default_admin)
+        return default_admin
             
+    # GitHub API로 원격 users.json 조회
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{FILE_PATH}"
     try:
         res = requests.get(url, headers=get_github_headers())
         if res.status_code == 200:
-            content = res.json()["content"]
+            content = res.json().get("content", "")
             decoded = base64.b64decode(content).decode("utf-8")
             users = json.loads(decoded)
-            with open(USER_DB_FILE, "w", encoding="utf-8") as f:
-                json.dump(users, f, ensure_ascii=False, indent=4)
-            return users
-        elif res.status_code == 404:
-            default_users = {
-                "admin": {
-                    "name": "마스터 관리자",
-                    "password": hash_password("admin1234"),
-                    "role": "admin",
-                    "approved": True
-                }
-            }
-            save_users(default_users)
-            return default_users
+            if users:
+                with open(USER_DB_FILE, "w", encoding="utf-8") as f:
+                    json.dump(users, f, ensure_ascii=False, indent=4)
+                return users
     except Exception:
         pass
-    return {}
+
+    # GitHub에 아직 users.json이 없거나 실패한 경우 즉시 기본 admin 생성 및 GitHub에 저장
+    save_users(default_admin)
+    return default_admin
 
 def save_users(users_dict):
     with open(USER_DB_FILE, "w", encoding="utf-8") as f:
