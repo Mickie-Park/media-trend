@@ -19,7 +19,7 @@ USER_DB_FILE = "users.json"
 LOG_DB_FILE = "activity_logs.json"
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# GitHub API 연동 설정
+# GitHub API 연동 설정 (media-trend로 통일)
 GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", None)
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "Mickie-Park/media-trend")
 FILE_PATH = "users.json"
@@ -88,20 +88,26 @@ def load_users():
     save_users(default_admin)
     return default_admin
 
-# 회원 DB 저장 (GitHub API 영구 동기화)
+# 회원 DB 저장 (GitHub API 동기화 및 원인 진단)
 def save_users(users_dict):
     with open(USER_DB_FILE, "w", encoding="utf-8") as f:
         json.dump(users_dict, f, ensure_ascii=False, indent=4)
         
     if not GITHUB_TOKEN:
-        return
+        st.error("❌ Secrets에 GITHUB_TOKEN이 설정되지 않았습니다.")
+        return False
 
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{FILE_PATH}"
     headers = get_github_headers()
     try:
         res = requests.get(url, headers=headers)
-        sha = res.json().get("sha") if res.status_code == 200 else None
-        
+        sha = None
+        if res.status_code == 200:
+            sha = res.json().get("sha")
+        elif res.status_code != 404:
+            st.error(f"❌ GitHub 파일 조회 실패 (상태코드 {res.status_code}): {res.text}")
+            return False
+            
         raw_content = json.dumps(users_dict, ensure_ascii=False, indent=4)
         b64_content = base64.b64encode(raw_content.encode("utf-8")).decode("utf-8")
         
@@ -112,9 +118,17 @@ def save_users(users_dict):
         if sha:
             payload["sha"] = sha
             
-        requests.put(url, headers=headers, json=payload)
-    except Exception:
-        pass
+        put_res = requests.put(url, headers=headers, json=payload)
+        if put_res.status_code in [200, 201]:
+            st.toast("✅ GitHub 저장 완료!", icon="💾")
+            return True
+        else:
+            # 401(토큰불일치), 403(권한부족), 404(저장소명불일치) 등 실제 사유 출력
+            st.error(f"❌ GitHub 저장 거절됨 [코드 {put_res.status_code}]: {put_res.json().get('message', put_res.text)}")
+            return False
+    except Exception as e:
+        st.error(f"❌ GitHub 통신 예외 발생: {e}")
+        return False
 
 # 활동 로그 기록 함수
 def log_activity(username, user_name, action, details=""):
