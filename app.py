@@ -24,7 +24,7 @@ GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", None)
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "Mickie-Park/media-trend")
 FILE_PATH = "users.json"
 
-# --- 2. Option C: 하이엔드 컨설팅 리포트 테마 + 사이드바 UI 버그 완전 해결 CSS ---
+# --- 2. Option C: 하이엔드 컨설팅 리포트 테마 + 업로더 버튼 완전 복원 CSS ---
 st.markdown("""
 <style>
     /* 1. Inter + Pretendard 글로벌 금융/컨설팅 서체 (콤팩트 스케일) */
@@ -61,20 +61,19 @@ st.markdown("""
         font-size: 0.76rem !important;
     }
 
-    /* ========================================================= */
-    /* 4. [핵심 해결] 사이드바 모든 버튼(로그아웃 등) 흰 박스 원천 차단 */
-    /* ========================================================= */
+    /* 4. 사이드바 버튼 기본 스타일 */
     [data-testid="stSidebar"] button,
     [data-testid="stSidebar"] .stButton button,
     [data-testid="stSidebar"] [data-testid="baseButton-primary"],
-    [data-testid="stSidebar"] [data-testid="baseButton-secondary"] {
+    [data-testid="stSidebar"] [data-testid="baseButton-secondary"],
+    [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"],
+    [data-testid="stSidebar"] [data-testid="stBaseButton-primary"] {
         background-color: #1E3A8A !important;
         border: 1px solid #3B82F6 !important;
         border-radius: 5px !important;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
     }
 
-    /* 버튼 내부 텍스트를 강제로 선명한 화이트 볼드로 렌더링 */
     [data-testid="stSidebar"] button div,
     [data-testid="stSidebar"] button p,
     [data-testid="stSidebar"] button span,
@@ -93,7 +92,7 @@ st.markdown("""
     }
 
     /* ========================================================= */
-    /* 5. [핵심 해결] 사이드바 엑셀 파일 업로더 흰 박스 제거 및 복원 */
+    /* 5. [핵심 교정] 엑셀 파일 업로더 흰 박스 완전 박멸 및 텍스트 복원 */
     /* ========================================================= */
     [data-testid="stSidebar"] [data-testid="stFileUploader"] {
         background-color: transparent !important;
@@ -106,23 +105,37 @@ st.markdown("""
         padding: 12px !important;
     }
 
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] section button {
-        background-color: #2563EB !important;
-        border: 1px solid #60A5FA !important;
+    /* 업로더 내부 버튼 (흰색 박스를 네이비/블루 버튼으로 교체) */
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] button,
+    [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] button,
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] [data-testid="stBaseButton-secondary"],
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] [data-testid="baseButton-secondary"] {
+        background-color: #1E3A8A !important;
+        border: 1px solid #3B82F6 !important;
+        color: #FFFFFF !important;
     }
 
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] section button div,
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] section button span,
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] section button p {
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] button:hover {
+        background-color: #2563EB !important;
+        border-color: #60A5FA !important;
+    }
+
+    /* 업로더 버튼 내부 텍스트(Browse files) 및 아이콘 강제 화이트 */
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] button *,
+    [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] button * {
         color: #FFFFFF !important;
+        fill: #FFFFFF !important;
         font-weight: 600 !important;
         font-size: 0.8rem !important;
         background: transparent !important;
+        opacity: 1 !important;
+        visibility: visible !important;
     }
 
+    /* 파일 규격 및 안내 문구 */
     [data-testid="stSidebar"] [data-testid="stFileUploader"] small,
     [data-testid="stSidebar"] [data-testid="stFileUploader"] span,
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] div {
+    [data-testid="stSidebar"] [data-testid="stFileUploaderDropzoneInstructions"] * {
         color: #94A3B8 !important;
         background: transparent !important;
     }
@@ -732,7 +745,7 @@ st.sidebar.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# [핵심 수정] 로그아웃 버튼을 primary 타입으로 지정하여 선명한 파란색 바탕 + 흰색 텍스트 강제 고정
+# 로그아웃 버튼 (Primary 타입으로 선명한 파란색 바탕 + 흰색 볼드 텍스트 고정)
 if st.sidebar.button("로그아웃", type="primary", use_container_width=True):
     log_activity(
         st.session_state["username"], 
@@ -928,7 +941,7 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
                         st.rerun()
                 else:
                     if u_id != "admin" and u_id != st.session_state["username"]:
-                        if btn_c1.button("대기전환", key=f"grid_unapp_{u_id}", type="primary"):
+                        if btn_c1.button("대기전환", key=f"grid_unapp_{u_id}"):
                             all_users[u_id]["approved"] = False
                             save_users(all_users)
                             log_activity(st.session_state["username"], st.session_state["user_name"], "승인 취소", f"대기 전환: {u_id}")
