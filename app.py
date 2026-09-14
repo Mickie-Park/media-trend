@@ -24,21 +24,21 @@ GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", None)
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "Mickie-Park/media-trend")
 FILE_PATH = "users.json"
 
-# --- 2. Option C: 하이엔드 컨설팅 리포트 테마 + Inter/한글 듀얼 하이브리드 (컴팩트 스케일) ---
+# --- 2. Option C: 하이엔드 컨설팅 리포트 테마 + 사이드바 UI 버그 완전 박멸 CSS ---
 st.markdown("""
 <style>
-    /* 1. Inter(글로벌 금융 표준 영문/숫자) + Pretendard(정갈한 한글) 폰트 로드 */
+    /* 1. Inter + Pretendard 글로벌 금융/컨설팅 서체 (콤팩트 스케일) */
     @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
     @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
     
-    html, body, [class*="css"], .stMarkdown, .stText, .stButton, .stTextInput, .stSelectbox {
+    html, body, [class*="css"], .stMarkdown, .stText, .stTextInput, .stSelectbox {
         font-family: "Inter", "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-        font-feature-settings: "cv02", "cv03", "cv04", "cv11", "tnum" !important; /* 고정폭 숫자(tnum) 및 정밀 렌더링 */
+        font-feature-settings: "cv02", "cv03", "cv04", "cv11", "tnum" !important;
         letter-spacing: -0.015em;
-        font-size: 0.94rem; /* 전체 베이스 폰트 크기 살짝 콤팩트하게 다운 */
+        font-size: 0.93rem;
     }
 
-    /* 2. 메인 캔버스: 우아하고 차분한 웜 오프화이트 */
+    /* 2. 메인 캔버스: 우아하고 눈이 편안한 웜 오프화이트 */
     .stApp {
         background-color: #FAF9F6;
         color: #1E293B;
@@ -50,8 +50,7 @@ st.markdown("""
         border-right: 1px solid #1E2E4A !important;
     }
     [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, 
-    [data-testid="stSidebar"] h4, [data-testid="stSidebar"] p, [data-testid="stSidebar"] span,
-    [data-testid="stSidebar"] label {
+    [data-testid="stSidebar"] h4, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label {
         color: #F8FAFC !important;
     }
     [data-testid="stSidebar"] hr {
@@ -59,70 +58,94 @@ st.markdown("""
     }
     [data-testid="stSidebar"] .stCaption {
         color: #94A3B8 !important;
-        font-size: 0.78rem !important;
+        font-size: 0.76rem !important;
     }
 
-    /* 4. 사이드바 버튼 시인성 완전 복원 */
-    /* A. 일반/보조 버튼 (로그아웃, 메인 복귀, 빠른 승인/반려 등) */
+    /* ========================================================= */
+    /* 4. [완전 해결] 사이드바 로그아웃 및 일반 버튼 텍스트 복원 */
+    /* ========================================================= */
+    [data-testid="stSidebar"] .stButton > button,
+    [data-testid="stSidebar"] [data-testid="baseButton-secondary"],
     [data-testid="stSidebar"] button[kind="secondary"] {
         background-color: #16243E !important;
-        border: 1px solid #2D4165 !important;
-        border-radius: 5px !important;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
-    }
-    [data-testid="stSidebar"] button[kind="secondary"] * {
-        color: #F8FAFC !important;
-        font-weight: 600 !important;
-        font-size: 0.83rem !important;
-    }
-    [data-testid="stSidebar"] button[kind="secondary"]:hover {
-        background-color: #1F3254 !important;
-        border-color: #4A638D !important;
-    }
-
-    /* B. 강조 버튼 (Primary - 회원 관리 콘솔, 승인 버튼 등) */
-    [data-testid="stSidebar"] button[kind="primary"] {
-        background-color: #1E3A8A !important;
         border: 1px solid #3B82F6 !important;
         border-radius: 5px !important;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25) !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+    }
+    
+    /* 흰색 배경 및 흰색 글씨 겹침 현상 원천 차단 */
+    [data-testid="stSidebar"] .stButton > button *,
+    [data-testid="stSidebar"] [data-testid="baseButton-secondary"] *,
+    [data-testid="stSidebar"] button[kind="secondary"] * {
+        color: #FFFFFF !important;
+        font-weight: 700 !important;
+        font-size: 0.84rem !important;
+        background: transparent !important;
+        opacity: 1 !important;
+    }
+    
+    [data-testid="stSidebar"] .stButton > button:hover,
+    [data-testid="stSidebar"] [data-testid="baseButton-secondary"]:hover {
+        background-color: #1E3A8A !important;
+        border-color: #60A5FA !important;
+    }
+
+    /* 사이드바 Primary 버튼 (회원 관리 콘솔 등) */
+    [data-testid="stSidebar"] button[kind="primary"] {
+        background-color: #2563EB !important;
+        border: 1px solid #60A5FA !important;
+        border-radius: 5px !important;
     }
     [data-testid="stSidebar"] button[kind="primary"] * {
         color: #FFFFFF !important;
         font-weight: 700 !important;
-        font-size: 0.83rem !important;
-    }
-    [data-testid="stSidebar"] button[kind="primary"]:hover {
-        background-color: #172554 !important;
-        border-color: #60A5FA !important;
+        font-size: 0.84rem !important;
+        background: transparent !important;
     }
 
-    /* 5. 사이드바 파일 업로더(엑셀 추가) 시인성 완전 복원 */
+    /* ========================================================= */
+    /* 5. [완전 해결] 사이드바 파일 업로더(엑셀 추가) 흰 박스 제거 */
+    /* ========================================================= */
     [data-testid="stSidebar"] [data-testid="stFileUploader"] {
         background-color: transparent !important;
     }
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] section {
-        background-color: #16243E !important;
-        border: 1px dashed #3B82F6 !important;
+    
+    /* 드롭존 박스 (파란색 점선 프레임) */
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] section,
+    [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
+        background-color: #13213B !important;
+        border: 1.5px dashed #3B82F6 !important;
         border-radius: 6px !important;
         padding: 12px !important;
     }
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] section * {
-        color: #E2E8F0 !important;
-        font-size: 0.8rem !important;
+    
+    /* 드롭존 내부 안내 텍스트 */
+    [data-testid="stSidebar"] [data-testid="stFileUploaderDropzoneInstructions"] *,
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] section span,
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] section small {
+        color: #94A3B8 !important;
+        background: transparent !important;
+        font-size: 0.76rem !important;
     }
+    
+    /* 업로더 내부 [Browse files] 버튼 복원 */
     [data-testid="stSidebar"] [data-testid="stFileUploader"] button {
         background-color: #1E3A8A !important;
         border: 1px solid #3B82F6 !important;
         border-radius: 4px !important;
+        padding: 4px 10px !important;
     }
     [data-testid="stSidebar"] [data-testid="stFileUploader"] button * {
         color: #FFFFFF !important;
         font-weight: 600 !important;
-        font-size: 0.8rem !important;
+        font-size: 0.78rem !important;
+        background: transparent !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] button:hover {
+        background-color: #2563EB !important;
     }
 
-    /* 6. 사이드바 내부 아코디언 및 입력창 */
+    /* 사이드바 내부 아코디언 및 입력창 */
     [data-testid="stSidebar"] [data-testid="stExpander"] {
         background-color: #13213B !important;
         border: 1px solid #243656 !important;
@@ -136,10 +159,12 @@ st.markdown("""
         border: 1px solid #2D4165 !important;
         color: #FFFFFF !important;
         border-radius: 4px !important;
-        font-size: 0.85rem !important;
+        font-size: 0.84rem !important;
     }
 
-    /* 7. 메인 본문 지표(Metric) 카드: 단정하고 콤팩트한 브리프 카드 */
+    /* ========================================================= */
+    /* 6. 메인 본문 지표 카드 및 탭 (컨설팅 리포트 콤팩트 스타일) */
+    /* ========================================================= */
     [data-testid="stMetric"] {
         background-color: #FFFFFF;
         padding: 14px 18px;
@@ -149,7 +174,7 @@ st.markdown("""
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
     }
     [data-testid="stMetricLabel"] {
-        font-size: 0.75rem !important;
+        font-size: 0.74rem !important;
         font-weight: 600 !important;
         text-transform: uppercase;
         letter-spacing: 0.05em;
@@ -162,7 +187,7 @@ st.markdown("""
         letter-spacing: -0.02em;
     }
 
-    /* 8. 탭(Tab) 커스텀: 단정한 미니멀 언더라인 탭 */
+    /* 탭 스타일 */
     .stTabs [data-baseweb="tab-list"] {
         gap: 10px;
         border-bottom: 2px solid #E2E8F0;
@@ -183,25 +208,24 @@ st.markdown("""
         background-color: transparent !important;
     }
 
-    /* 9. 메인 영역 버튼 */
+    /* 메인 화면 일반 버튼 */
     .stApp > div:not([data-testid="stSidebar"]) button[kind="primary"] {
         background-color: #1E3A8A !important;
         border-color: #1E3A8A !important;
         color: #FFFFFF !important;
         border-radius: 4px !important;
         font-weight: 600 !important;
-        font-size: 0.86rem !important;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        font-size: 0.85rem !important;
     }
     .stApp > div:not([data-testid="stSidebar"]) button[kind="secondary"] {
         background-color: #FFFFFF !important;
         border: 1px solid #CBD5E1 !important;
         color: #334155 !important;
         border-radius: 4px !important;
-        font-size: 0.86rem !important;
+        font-size: 0.85rem !important;
     }
 
-    /* 10. 아코디언 및 셀렉트박스 / 인풋 */
+    /* 본문 아코디언 및 인풋 */
     .stApp > div:not([data-testid="stSidebar"]) [data-testid="stExpander"] {
         background-color: #FFFFFF;
         border: 1px solid #E2E8F0 !important;
@@ -213,7 +237,7 @@ st.markdown("""
         border-color: #CBD5E1 !important;
         border-radius: 4px !important;
         background-color: #FFFFFF !important;
-        font-size: 0.88rem !important;
+        font-size: 0.86rem !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -726,7 +750,7 @@ st.sidebar.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# 로그아웃 버튼 (명확한 고대비)
+# 로그아웃 버튼 (선명한 고대비)
 if st.sidebar.button("로그아웃", use_container_width=True):
     log_activity(
         st.session_state["username"], 
@@ -825,7 +849,7 @@ if st.session_state["role"] == "admin":
         else:
             st.caption("현재 승인 대기자가 없습니다.")
 
-    # 엑셀 업로더 (고대비 보정)
+    # 엑셀 업로더 (고대비 보정 완료)
     new_file = st.sidebar.file_uploader("월간 엑셀 추가 (.xlsx)", type=["xlsx"])
     if new_file is not None:
         save_path = os.path.join(DATA_DIR, new_file.name)
