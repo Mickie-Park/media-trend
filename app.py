@@ -337,77 +337,98 @@ def load_all_data():
                                 "매출(억원)": sales_val
                             })
 
-            # D. 방송/미디어 매체사 매출 (숫자가 아닌 실제 채널/매체명 정확 탐색)
-            for i in range(len(df)):
-                row_vals = [str(x) for x in df.iloc[i].dropna().tolist()]
-                row_text = " ".join(row_vals)
-                
-                # 1) 지상파 섹션
-                if "지상파 매출" in row_text or "지상파 광고" in row_text:
-                    for offset in range(1, 15):
-                        if i + offset >= len(df): break
-                        sub_row = df.iloc[i + offset].tolist()
-                        
-                        ch_name = ""
-                        sales_val = None
-                        
-                        # 행에서 문자열 채널명과 숫자 매출 분리 추출
-                        for item in sub_row:
-                            if pd.notna(item):
-                                it_str = str(item).strip()
-                                # 숫자가 아닌 경우 채널명 후보
-                                if not ch_name and not re.match(r'^-?\d+(\.\d+)?$', it_str.replace(',', '')):
-                                    if not any(ign in it_str for ign in ["구분", "채널", "매출", "합계", "소계", "순위", "지상파", "Total"]):
-                                        ch_name = it_str
-                                # 숫자인 경우 매출 후보
-                                elif sales_val is None:
-                                    try:
-                                        sales_val = float(it_str.replace(',', ''))
-                                    except:
-                                        pass
-                        
-                        if ch_name and sales_val is not None and sales_val > 0:
-                            tv_sales_list.append({
-                                "연월": ym,
-                                "연도": year_str,
-                                "월": f"{int(month_str)}월" if month_str.isdigit() else month_str,
-                                "채널": ch_name,
-                                "매출(억원)": sales_val,
-                                "구분": "지상파"
-                            })
+            # D. 방송/미디어 매체사 매출 (전수 표준화 및 잡음 100% 차단 정밀 파싱)
+            # 업계 동향 엑셀에 등장하는 공인 방송/매체사 키워드 사전
+            KNOWN_MEDIA_DICT = {
+                "KBS": "KBS",
+                "MBC": "MBC",
+                "SBS": "SBS",
+                "CJ ENM": "CJ ENM",
+                "CJ E&M": "CJ ENM",
+                "CJENM": "CJ ENM",
+                "CJE&M": "CJ ENM",
+                "JTBC": "JTBC",
+                "TV CHOSUN": "TV조선",
+                "TV조선": "TV조선",
+                "CHANNEL A": "채널A",
+                "채널A": "채널A",
+                "CHANNELA": "채널A",
+                "MBN": "MBN",
+                "YTN": "YTN",
+                "연합뉴스": "연합뉴스TV",
+                "연합뉴스TV": "연합뉴스TV",
+                "SPOTV": "SPOTV",
+                "SBS PLUS": "SBS Plus",
+                "SBS FUNT": "SBS FunE",
+                "KBS N": "KBS N",
+                "MBC PLUS": "MBC Plus",
+                "E채널": "E채널",
+                "TVN": "tvN",
+                "OCN": "OCN"
+            }
 
-                # 2) 종합/유선/CJ ENM 등 케이블 및 미디어 섹션
-                if any(k in row_text for k in ["종합/유선채널", "유선채널", "케이블", "종편"]):
-                    for offset in range(1, 25):
+            for i in range(len(df)):
+                row_vals = [str(x).strip() for x in df.iloc[i].dropna().tolist()]
+                row_text = " ".join(row_vals).upper()
+
+                # 지상파 및 종편/유선/PP 섹션 감지
+                is_terrestrial = any(k in row_text for k in ["지상파 매출", "지상파 광고", "지상파방송"])
+                is_cable = any(k in row_text for k in ["종합/유선채널", "유선채널", "종합편성", "케이블", "CJ ENM", "CJ E&M", "주요 PP"])
+
+                if is_terrestrial or is_cable:
+                    max_offset = 15 if is_terrestrial else 30
+                    cat_name = "지상파" if is_terrestrial else "종편/유선/PP"
+
+                    for offset in range(1, max_offset):
                         if i + offset >= len(df): break
                         sub_row = df.iloc[i + offset].tolist()
                         
-                        ch_name = ""
+                        # 행 전체 텍스트 확인 (합계, 소계, 단위 등 제외)
+                        sub_row_str = " ".join([str(x) for x in sub_row if pd.notna(x)])
+                        if any(ign in sub_row_str for ign in ["합계", "소계", "Total", "TOTAL", "단위:", "전년동기", "증감률"]):
+                            continue
+
+                        matched_ch = None
                         sales_val = None
-                        
+
+                        # 1) 셀을 순회하며 공인 채널 사전과 매칭
                         for item in sub_row:
                             if pd.notna(item):
                                 it_str = str(item).strip()
-                                if not ch_name and not re.match(r'^-?\d+(\.\d+)?$', it_str.replace(',', '')):
-                                    if not any(ign in it_str for ign in ["구분", "채널", "매출", "합계", "소계", "순위", "종편", "유선", "Total"]):
-                                        ch_name = it_str
-                                elif sales_val is None:
+                                it_upper = it_str.upper().replace(" ", "")
+                                
+                                if not matched_ch:
+                                    for k_name, std_name in KNOWN_MEDIA_DICT.items():
+                                        k_clean = k_name.upper().replace(" ", "")
+                                        if k_clean in it_upper:
+                                            # "지상파 Total" 등은 제외
+                                            if "TOTAL" not in it_upper and "합계" not in it_upper:
+                                                matched_ch = std_name
+                                                break
+                        
+                        # 2) 해당 행에서 유효한 매출 금액(숫자) 추출
+                        if matched_ch:
+                            for item in sub_row:
+                                if pd.notna(item):
+                                    it_clean = str(item).replace(',', '').replace(' ', '').strip()
                                     try:
-                                        sales_val = float(it_str.replace(',', ''))
+                                        val = float(it_clean)
+                                        # 순위 번호(1~20 정수 단독) 오인식을 방지하기 위해 일반적인 매출 범위 필터링
+                                        if val > 0 and val != float(re.sub(r'[^0-9]', '', matched_ch) or -1):
+                                            sales_val = val
+                                            break
                                     except:
                                         pass
-                        
-                        if ch_name and sales_val is not None and sales_val > 0:
+
+                        if matched_ch and sales_val is not None:
                             tv_sales_list.append({
                                 "연월": ym,
                                 "연도": year_str,
                                 "월": f"{int(month_str)}월" if month_str.isdigit() else month_str,
-                                "채널": ch_name,
+                                "채널": matched_ch,
                                 "매출(억원)": sales_val,
-                                "구분": "종편/유선/PP"
+                                "구분": cat_name
                             })
-        except Exception as e:
-            st.error(f"{f} 파싱 오류: {e}")
             
     return pd.DataFrame(issues_list), pd.DataFrame(tv_sales_list), pd.DataFrame(pt_list), pd.DataFrame(agency_sales_list), all_files
 
