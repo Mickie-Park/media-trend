@@ -24,10 +24,10 @@ GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", None)
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "Mickie-Park/media-trend")
 FILE_PATH = "users.json"
 
-# --- 2. Option C: 서류철형 세그먼트 탭 + 검색 블록 일체화 완벽 보장 CSS ---
+# --- 2. Option C: 서류철형 세그먼트 탭 + 검색 블록 일체화 CSS ---
 st.markdown("""
 <style>
-    /* 1. 글로벌 표준 Inter + Pretendard 타이포그래피 (쾌적한 가독성 규격) */
+    /* 1. 글로벌 표준 Inter + Pretendard 타이포그래피 */
     @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
     @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
     
@@ -38,15 +38,12 @@ st.markdown("""
         font-size: 0.90rem !important;
     }
 
-    /* 메인 캔버스 */
     .stApp {
         background-color: #F8FAFC !important;
         color: #1E293B !important;
     }
 
-    /* ========================================================= */
-    /* 1. 상단 고정 붙박이(Sticky) 간판 헤더                      */
-    /* ========================================================= */
+    /* 1. 상단 고정 붙박이(Sticky) 간판 헤더 */
     .sticky-main-header {
         position: -webkit-sticky;
         position: sticky;
@@ -65,14 +62,12 @@ st.markdown("""
         justify-content: space-between;
     }
 
-    /* ========================================================= */
-    /* 2. [미리보기 완벽 일치] 카테고리 선택 버튼 (ON/OFF 세그먼트) */
-    /* ========================================================= */
+    /* 2. 카테고리 선택 버튼 (ON/OFF 세그먼트) */
     div[data-testid="stRadio"] > div[role="radiogroup"] {
         display: flex !important;
         flex-direction: row !important;
         gap: 6px !important;
-        margin-bottom: -2px !important; /* 바디 컨테이너와 틈새 없이 접합 */
+        margin-bottom: -2px !important;
         z-index: 5 !important;
     }
 
@@ -97,18 +92,17 @@ st.markdown("""
         background-color: #CBD5E1 !important;
     }
 
-    /* 라디오 원형 체크 아이콘 숨기기 */
     div[data-testid="stRadio"] > div[role="radiogroup"] > label input[type="radio"],
     div[data-testid="stRadio"] > div[role="radiogroup"] > label > div:first-child {
         display: none !important;
     }
 
-    /* ON 버튼: 바디와 동일한 화이트 + 하단선 관통 + 상단 네이비 포인트 */
+    /* ON 버튼: 바디와 동일한 화이트 + 하단선 관통 */
     div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input:checked) {
         background-color: #FFFFFF !important;
         border: 2px solid #CBD5E1 !important;
         border-top: 3px solid #1E3A8A !important;
-        border-bottom: 3px solid #FFFFFF !important; /* 아래 바디와 단절 없이 직결 */
+        border-bottom: 3px solid #FFFFFF !important;
         border-radius: 8px 8px 0 0 !important;
         z-index: 10 !important;
     }
@@ -119,9 +113,7 @@ st.markdown("""
         font-size: 0.90rem !important;
     }
 
-    /* ========================================================= */
-    /* 3. 지표(Metric) 카드: 콤팩트 규격                          */
-    /* ========================================================= */
+    /* 3. 지표(Metric) 카드 */
     [data-testid="stMetric"] {
         background-color: #F8FAFC !important;
         padding: 14px 18px !important;
@@ -144,9 +136,7 @@ st.markdown("""
         letter-spacing: -0.02em;
     }
 
-    /* ========================================================= */
-    /* 4. 사이드바 UI 완벽 가독성 (로그아웃, 업로더)               */
-    /* ========================================================= */
+    /* 4. 사이드바 UI 가독성 */
     [data-testid="stSidebar"] {
         background-color: #0C1A30 !important;
         border-right: 1px solid #1E2E4A !important;
@@ -194,7 +184,6 @@ st.markdown("""
         border-color: #60A5FA !important;
     }
 
-    /* 엑셀 파일 업로더 */
     [data-testid="stSidebar"] [data-testid="stFileUploader"] {
         background-color: transparent !important;
     }
@@ -225,7 +214,6 @@ st.markdown("""
         background: transparent !important;
     }
 
-    /* 사이드바 아코디언 및 입력창 */
     [data-testid="stSidebar"] [data-testid="stExpander"] {
         background-color: #13213B !important;
         border: 1px solid #243656 !important;
@@ -244,7 +232,6 @@ st.markdown("""
         height: 34px !important;
     }
 
-    /* 본문 폼 컴포넌트 */
     div[data-baseweb="select"] > div, .stApp > div:not([data-testid="stSidebar"]) .stTextInput input {
         border-color: #CBD5E1 !important;
         border-radius: 4px !important;
@@ -357,7 +344,6 @@ def save_users(users_dict):
         st.error(f"❌ GitHub 통신 예외 발생: {e}")
         return False
 
-# 활동 로그 기록 함수
 def log_activity(username, user_name, action, details=""):
     now = get_now_kst()
     timestamp_str = now.strftime("%Y-%m-%d %H:%M:%S")
@@ -428,7 +414,7 @@ if auth_token and not st.session_state["logged_in"]:
         st.session_state["user_name"] = users_current[auth_token].get("name", auth_token)
         st.session_state["login_time"] = get_now_kst()
 
-# --- 3. 엑셀 데이터 파싱 함수 ---
+# --- 3. [핵심] 원본 엑셀 실데이터 구조 기반 정확한 파싱 함수 ---
 @st.cache_data
 def load_all_data():
     raw_files = glob.glob("**/*.[xX][lL][sS][xX]", recursive=True)
@@ -497,69 +483,109 @@ def load_all_data():
                 elif current_issue and text.startswith("-"):
                     issues_list.append({"연월": ym, "헤드라인": current_issue, "상세": text[1:].strip()})
             
-            # B. 광고회사 PT 현황
-            pt_start_row, pt_end_row = -1, -1
+            # B. [원 데이터 기반 완벽 수정] 광고회사 PT 현황 파싱
+            pt_header_indices = []
             for i in range(len(df)):
-                row_str = " ".join([str(x) for x in df.iloc[i].dropna().tolist()])
-                if "광고회사 PT" in row_str and "종합편" in row_str:
-                    pt_start_row = i + 2
-                elif "광고회사 전파광고" in row_str and pt_start_row != -1:
-                    pt_end_row = i
-                    break
-            
-            if pt_start_row != -1 and pt_end_row != -1:
-                for r in range(pt_start_row, pt_end_row):
-                    row_vals = df.iloc[r].tolist()
-                    pt_date = row_vals[0]
-                    client = row_vals[1]
-                    product = row_vals[2]
-                    billing = row_vals[3]
-                    participants = row_vals[4] if len(row_vals) > 4 else ""
-                    incumbent = row_vals[5] if len(row_vals) > 5 else ""
-                    winner = row_vals[6] if len(row_vals) > 6 else ""
-                    memo = row_vals[7] if len(row_vals) > 7 else ""
+                row_str = " ".join([str(x).strip().replace(" ", "") for x in df.iloc[i].dropna().tolist()])
+                if "광고회사PT" in row_str or ("PT일자" in row_str and "광고주" in row_str):
+                    pt_header_indices.append(i)
+
+            def clean_str(val):
+                if pd.isna(val): return ""
+                v = str(val).strip()
+                if v.lower() in ["nan", "none", "-"]: return ""
+                return v
+
+            # 엑셀 시트 내 모든 PT 섹션을 순회하며 정확한 헤더 매핑 수행
+            for p_idx in range(len(df)):
+                row_cells = [clean_str(x) for x in df.iloc[p_idx].tolist()]
+                row_text = "".join(row_cells)
+                
+                # 헤더 행 발견 시
+                if "PT일자" in row_text and "광고주" in row_text:
+                    # 열 매핑 딕셔너리 생성
+                    col_map = {
+                        "date": 0, "client": 1, "product": 2, "billing": 3,
+                        "participants": 4, "incumbent": 6, "winner": 7, "memo": 8
+                    }
                     
-                    if pd.notna(client) and str(client).strip() != "광고주":
-                        client_str = str(client).strip()
-                        date_raw_str = str(pt_date).strip() if pd.notna(pt_date) else ""
+                    for c_i, c_val in enumerate(row_cells):
+                        c_clean = c_val.replace(" ", "").replace("\n", "")
+                        if "일자" in c_clean: col_map["date"] = c_i
+                        elif "광고주" in c_clean: col_map["client"] = c_i
+                        elif "품목" in c_clean or "과제" in c_clean: col_map["product"] = c_i
+                        elif "빌링" in c_clean or "규모" in c_clean: col_map["billing"] = c_i
+                        elif "참여사" in c_clean or "참여" in c_clean: col_map["participants"] = c_i
+                        elif "기존사" in c_clean or "기존" in c_clean: col_map["incumbent"] = c_i
+                        elif "선정사" in c_clean or "결과" in c_clean: col_map["winner"] = c_i
+                        elif "비고" in c_clean or "메모" in c_clean: col_map["memo"] = c_i
 
-                        excluded_agencies = [
-                            "TBWA", "SM C&C", "HS AD", "차이커뮤니케이션", 
-                            "제일기획", "이노션", "대홍기획", "Dentsu", "덴츠"
-                        ]
-                        if any(ag in date_raw_str for ag in excluded_agencies) or any(ag in client_str for ag in excluded_agencies):
-                            continue
-
-                        if "광고회사" in client_str or "종합편" in client_str:
-                            continue
-
-                        date_str = pt_date.strftime("%Y-%m-%d") if isinstance(pt_date, pd.Timestamp) else date_raw_str
+                    # 데이터 행 스캔
+                    for r_i in range(p_idx + 1, len(df)):
+                        sub_row = df.iloc[r_i].tolist()
+                        row_full_str = " ".join([clean_str(x) for x in sub_row])
                         
+                        # 다른 섹션 진입 시 중단
+                        if any(stop_kw in row_full_str for stop_kw in ["광고회사 전파광고", "대행사 전파광고", "지상파 매출", "종합/유선채널"]):
+                            break
+                        if "PT일자" in row_full_str and "광고주" in row_full_str:
+                            break
+                        
+                        client_val = clean_str(sub_row[col_map["client"]]) if col_map["client"] < len(sub_row) else ""
+                        if not client_val or client_val in ["광고주", "합계", "소계", "Total"]:
+                            continue
+                        if "광고회사" in client_val or "종합편" in client_val:
+                            continue
+
+                        # 날짜 정제 (00:00:00 제거)
+                        date_cell = sub_row[col_map["date"]] if col_map["date"] < len(sub_row) else ""
+                        date_str = ""
+                        if pd.notna(date_cell):
+                            if isinstance(date_cell, (datetime, pd.Timestamp)):
+                                date_str = date_cell.strftime("%Y-%m-%d")
+                            else:
+                                date_str = clean_str(date_cell)
+                                if len(date_str) >= 10 and date_str[:10].replace("-", "").isdigit():
+                                    date_str = date_str[:10]
+
+                        # 참여사/대행사 잘못 읽힌 경우 필터
+                        excluded_agencies = ["TBWA", "SM C&C", "HS AD", "차이커뮤니케이션", "제일기획", "이노션", "대홍기획", "Dentsu", "덴츠"]
+                        if any(ag in date_str for ag in excluded_agencies) or any(ag in client_val for ag in excluded_agencies):
+                            continue
+
                         pt_year = year_str
                         ymatch = re.search(r'(\d{4})', date_str)
                         if ymatch:
                             pt_year = ymatch.group(1)
 
+                        billing_raw = clean_str(sub_row[col_map["billing"]]) if col_map["billing"] < len(sub_row) else ""
                         billing_val = 0.0
-                        b_match = re.search(r'(\d+)', str(billing))
+                        b_match = re.search(r'(\d+)', billing_raw)
                         if b_match:
                             try:
                                 billing_val = float(b_match.group(1))
                             except:
                                 pass
-                            
+
+                        # 원 데이터 기준 완벽 분리 추출
+                        product_val = clean_str(sub_row[col_map["product"]]) if col_map["product"] < len(sub_row) else ""
+                        participants_val = clean_str(sub_row[col_map["participants"]]) if col_map["participants"] < len(sub_row) else ""
+                        incumbent_val = clean_str(sub_row[col_map["incumbent"]]) if col_map["incumbent"] < len(sub_row) else ""
+                        winner_val = clean_str(sub_row[col_map["winner"]]) if col_map["winner"] < len(sub_row) else ""
+                        memo_val = clean_str(sub_row[col_map["memo"]]) if col_map["memo"] < len(sub_row) else ""
+
                         pt_list.append({
                             "발행연월": ym,
                             "연도": pt_year,
                             "PT일자": date_str,
-                            "광고주": client_str,
-                            "품목": str(product).strip() if pd.notna(product) else "",
+                            "광고주": client_val,
+                            "품목": product_val,
                             "빌링(억원)": billing_val,
-                            "빌링_원문": str(billing).strip() if pd.notna(billing) else "",
-                            "참여사": str(participants).strip() if pd.notna(participants) else "",
-                            "기존사": str(incumbent).strip() if pd.notna(incumbent) else "",
-                            "선정사": str(winner).strip() if pd.notna(winner) else "",
-                            "메모": str(memo).strip() if pd.notna(memo) else ""
+                            "빌링_원문": billing_raw,
+                            "참여사": participants_val,
+                            "기존사": incumbent_val,
+                            "선정사(결과)": winner_val,
+                            "메모(비고)": memo_val
                         })
 
             # C. 대행사 전파광고 매출
@@ -877,7 +903,7 @@ st.sidebar.markdown("---")
 st.sidebar.caption(f"적재 완료 파일: **{len(loaded_files)}건**")
 
 # =========================================================================
-# 6. [관리자 전용 페이지] 회원 관리 및 활동 로그 (admin_view == True 일 때)
+# 6. [관리자 전용 페이지] 회원 관리 및 활동 로그
 # =========================================================================
 if st.session_state["role"] == "admin" and st.session_state.get("admin_view", False):
     c_head1, c_head2 = st.columns([4, 1])
@@ -1052,10 +1078,10 @@ with search_container:
             cond_pt = (
                 df_pt_unique["광고주"].str.contains(global_query, case=False, na=False) |
                 df_pt_unique["품목"].str.contains(global_query, case=False, na=False) |
-                df_pt_unique["선정사"].str.contains(global_query, case=False, na=False) |
-                df_pt_unique["참여사"].str.contains(global_query, case=False, na=False) |
                 df_pt_unique["기존사"].str.contains(global_query, case=False, na=False) |
-                df_pt_unique["메모"].str.contains(global_query, case=False, na=False)
+                df_pt_unique["참여사"].str.contains(global_query, case=False, na=False) |
+                df_pt_unique["선정사(결과)"].str.contains(global_query, case=False, na=False) |
+                df_pt_unique["메모(비고)"].str.contains(global_query, case=False, na=False)
             )
             matched_pt = df_pt_unique[cond_pt]
             
@@ -1088,7 +1114,7 @@ with search_container:
         if len(matched_pt) > 0:
             with st.expander(f"PT 수주 현황 검색 결과 ({len(matched_pt)}건)", expanded=True):
                 st.dataframe(
-                    matched_pt[["발행연월", "PT일자", "광고주", "품목", "빌링_원문", "참여사", "선정사", "메모"]].rename(columns={"빌링_원문": "빌링(억원)"}),
+                    matched_pt[["발행연월", "PT일자", "광고주", "품목", "빌링_원문", "참여사", "기존사", "선정사(결과)", "메모(비고)"]].rename(columns={"빌링_원문": "빌링(억원)"}),
                     hide_index=True,
                     use_container_width=True
                 )
@@ -1122,7 +1148,7 @@ selected_category = st.radio(
     label_visibility="collapsed"
 )
 
-# 선택된 버튼과 100% 동일한 화이트로 연결되는 일체형 바디 컨테이너
+# 선택된 버튼과 일체화되는 바디 컨테이너
 body_container = st.container(border=True)
 with body_container:
     # 탭 1: PT 수주 현황
@@ -1153,17 +1179,18 @@ with body_container:
                 max_b_val = int(df_pt_unique['빌링(억원)'].max()) if df_pt_unique['빌링(억원)'].max() > 0 else 100
                 min_b = st.slider("최소 빌링 (억원)", 0, max_b_val, 0)
             with f_col3:
-                winner_search = st.text_input("선정사(승자) 검색", placeholder="예: 제일, 이노션, 차이")
+                winner_search = st.text_input("선정사(결과) 검색", placeholder="예: 제일, 이노션, 차이")
 
             if search_query:
                 view_pt = view_pt[view_pt["광고주"].str.contains(search_query, na=False) | view_pt["품목"].str.contains(search_query, na=False)]
             if min_b > 0:
                 view_pt = view_pt[view_pt["빌링(억원)"] >= min_b]
             if winner_search:
-                view_pt = view_pt[view_pt["선정사"].str.contains(winner_search, na=False)]
+                view_pt = view_pt[view_pt["선정사(결과)"].str.contains(winner_search, na=False)]
 
+            # 원본 엑셀 컬럼 배열과 100% 일치: PT일자 -> 광고주 -> 품목 -> 빌링 -> 참여사 -> 기존사 -> 선정사(결과) -> 메모(비고)
             st.dataframe(
-                view_pt[["PT일자", "광고주", "품목", "빌링_원문", "참여사", "기존사", "선정사", "메모"]].rename(columns={"빌링_원문": "빌링(억원)"}),
+                view_pt[["PT일자", "광고주", "품목", "빌링_원문", "참여사", "기존사", "선정사(결과)", "메모(비고)"]].rename(columns={"빌링_원문": "빌링(억원)"}),
                 use_container_width=True,
                 hide_index=True
             )
@@ -1273,10 +1300,10 @@ with body_container:
                             )
                             st.plotly_chart(fig_yoy_ag, use_container_width=True)
                             st.dataframe(df_yoy_ag, hide_index=True, use_container_width=True)
-                        else:
-                            st.info(f"{prev_year}년 또는 {yoy_base_year}년 데이터가 부족합니다.")
                     else:
-                        st.caption("축적된 연도 데이터가 2개 이상일 때 YoY 분석이 가능합니다.")
+                        st.info(f"{prev_year}년 또는 {yoy_base_year}년 데이터가 부족합니다.")
+                else:
+                    st.caption("축적된 연도 데이터가 2개 이상일 때 YoY 분석이 가능합니다.")
             else:
                 st.info("대행사 매출 집계 중")
 
@@ -1369,10 +1396,10 @@ with body_container:
                             )
                             st.plotly_chart(fig_yoy_tv, use_container_width=True)
                             st.dataframe(df_yoy_tv, hide_index=True, use_container_width=True)
-                        else:
-                            st.info(f"{prev_tv_year}년 또는 {yoy_tv_base}년 데이터가 부족합니다.")
                     else:
-                        st.caption("축적된 연도 데이터가 2개 이상일 때 YoY 분석이 가능합니다.")
+                        st.info(f"{prev_tv_year}년 또는 {yoy_tv_base}년 데이터가 부족합니다.")
+                else:
+                    st.caption("축적된 연도 데이터가 2개 이상일 때 YoY 분석이 가능합니다.")
             else:
                 st.info("방송사 매출 집계 중")
 
