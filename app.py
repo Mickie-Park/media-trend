@@ -24,10 +24,10 @@ GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", None)
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "Mickie-Park/media-trend")
 FILE_PATH = "users.json"
 
-# --- 2. Option C: 서류철형 일체화 탭 + 단일 검색 카드 + 마이크로 콤팩트 서체 CSS ---
+# --- 2. Option C: 서류철형(Folder-Tab) 일체화 + 검색 블록 일체화 CSS ---
 st.markdown("""
 <style>
-    /* 1. Inter + Pretendard 글로벌 금융/컨설팅 서체 (마이크로 콤팩트 스케일) */
+    /* 1. 글로벌 표준 Inter + Pretendard 타이포그래피 (안정적인 가독성 규격) */
     @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
     @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
     
@@ -35,10 +35,10 @@ st.markdown("""
         font-family: "Inter", "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
         font-feature-settings: "cv02", "cv03", "cv04", "cv11", "tnum" !important;
         letter-spacing: -0.015em;
-        font-size: 0.85rem !important; /* 전체 폰트 크기 대폭 축소 */
+        font-size: 0.90rem !important; /* 너무 작지 않은 쾌적한 폰트 스케일 */
     }
 
-    /* 메인 캔버스 톤 */
+    /* 메인 캔버스 */
     .stApp {
         background-color: #F8FAFC;
         color: #1E293B;
@@ -54,100 +54,107 @@ st.markdown("""
         z-index: 999;
         background: #FFFFFF;
         border-bottom: 2px solid #1E3A8A;
-        padding: 10px 24px;
-        margin-left: -5rem;
-        margin-right: -5rem;
-        margin-top: -3.8rem;
-        margin-bottom: 20px;
-        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+        padding: 12px 24px;
+        margin-left: -2rem;
+        margin-right: -2rem;
+        margin-top: -3.5rem;
+        margin-bottom: 24px;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
         display: flex;
         align-items: center;
         justify-content: space-between;
     }
 
     /* ========================================================= */
-    /* 2. 전 카테고리 통합 검색: 단일 완전 폐쇄형 블록 카드       */
+    /* 2. 전 카테고리 통합 검색: 완벽한 단일 박스 컨테이너         */
     /* ========================================================= */
-    .search-block-card {
-        background: #FFFFFF;
-        border: 1px solid #CBD5E1;
-        border-left: 4px solid #1E3A8A;
-        border-radius: 6px;
-        padding: 16px 20px 14px 20px;
-        margin-bottom: 20px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        background-color: #FFFFFF !important;
+        border: 1px solid #CBD5E1 !important;
+        border-left: 4px solid #1E3A8A !important;
+        border-radius: 8px !important;
+        padding: 16px 20px !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+        margin-bottom: 24px !important;
     }
 
     /* ========================================================= */
     /* 3. [Folder-Tab 일체화] 탭 버튼과 바디가 매끄럽게 연결되는 구조 */
     /* ========================================================= */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 4px;
-        border-bottom: 1px solid #CBD5E1 !important;
+    div[data-testid="stTabs"] div[role="tablist"] {
+        gap: 6px !important;
+        border-bottom: 2px solid #CBD5E1 !important;
         background-color: transparent !important;
-        padding-left: 2px;
-        margin-bottom: -1px; /* 바디 테두리와 완전 밀착 */
+        padding: 0 !important;
+        margin-bottom: -2px !important;
     }
 
-    /* OFF 탭: 차분하고 눈이 편안한 소프트 슬레이트 */
-    .stTabs [data-baseweb="tab"] {
+    /* OFF 탭: 차분한 소프트 슬레이트 버튼 (뚜렷한 글씨) */
+    div[data-testid="stTabs"] button[role="tab"] {
         background-color: #E2E8F0 !important;
-        color: #475569 !important;
         border: 1px solid #CBD5E1 !important;
-        border-bottom: 1px solid #CBD5E1 !important;
-        border-radius: 6px 6px 0 0 !important;
-        height: 38px !important;
-        font-size: 0.80rem !important;
+        border-bottom: 2px solid #CBD5E1 !important;
+        border-radius: 8px 8px 0 0 !important;
+        padding: 8px 20px !important;
+        height: 42px !important;
+        transition: all 0.2s ease !important;
+    }
+    div[data-testid="stTabs"] button[role="tab"] p,
+    div[data-testid="stTabs"] button[role="tab"] div {
+        color: #475569 !important;
         font-weight: 600 !important;
-        padding: 0 18px !important;
-        transition: all 0.15s ease-in-out;
+        font-size: 0.88rem !important;
     }
-    .stTabs [data-baseweb="tab"]:hover {
+    div[data-testid="stTabs"] button[role="tab"]:hover {
         background-color: #CBD5E1 !important;
-        color: #1E293B !important;
     }
 
-    /* ON 탭: 바디와 100% 동일한 화이트 배경 + 하단선 제거로 일체화 */
-    .stTabs [aria-selected="true"] {
+    /* ON 탭: 바디와 100% 동일한 화이트 배경 + 하단선 뚫기로 일체화 */
+    div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] {
         background-color: #FFFFFF !important;
-        color: #1E3A8A !important;
-        border: 1.5px solid #CBD5E1 !important;
-        border-top: 3px solid #1E3A8A !important;
+        border: 2px solid #1E3A8A !important;
         border-bottom: 2px solid #FFFFFF !important; /* 바디와 틈새 없이 관통 */
-        font-weight: 700 !important;
-        z-index: 2;
+        border-radius: 8px 8px 0 0 !important;
+        margin-bottom: -2px !important;
+        z-index: 10 !important;
+    }
+    div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] p,
+    div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] div {
+        color: #1E3A8A !important;
+        font-weight: 800 !important;
+        font-size: 0.90rem !important;
     }
 
-    /* 탭 바디 영역: 탭과 동일한 화이트 일체형 캔버스 */
-    .stTabs [data-baseweb="tab-panel"] {
-        background-color: #FFFFFF;
-        border: 1.5px solid #CBD5E1;
-        border-radius: 0 6px 6px 6px;
-        padding: 20px;
-        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+    /* 탭 바디 영역: 탭과 일체화되는 화이트 패널 */
+    div[data-testid="stTabs"] div[role="tabpanel"] {
+        background-color: #FFFFFF !important;
+        border: 2px solid #1E3A8A !important;
+        border-radius: 0 8px 8px 8px !important;
+        padding: 24px !important;
+        box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04) !important;
         margin-top: 0 !important;
     }
 
     /* ========================================================= */
-    /* 4. 지표(Metric) 카드: 마이크로 콤팩트 서체                */
+    /* 4. 지표(Metric) 카드                                      */
     /* ========================================================= */
     [data-testid="stMetric"] {
         background-color: #F8FAFC;
-        padding: 10px 14px;
-        border-radius: 4px;
+        padding: 14px 18px;
+        border-radius: 6px;
         border: 1px solid #E2E8F0;
-        border-left: 3px solid #1E3A8A;
+        border-left: 3.5px solid #1E3A8A;
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
     }
     [data-testid="stMetricLabel"] {
-        font-size: 0.70rem !important;
+        font-size: 0.74rem !important;
         font-weight: 600 !important;
         text-transform: uppercase;
         letter-spacing: 0.04em;
         color: #64748B !important;
     }
     [data-testid="stMetricValue"] {
-        font-size: 1.25rem !important;
+        font-size: 1.40rem !important;
         font-weight: 700 !important;
         color: #0F172A !important;
         letter-spacing: -0.02em;
@@ -163,14 +170,14 @@ st.markdown("""
     [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, 
     [data-testid="stSidebar"] h4, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label {
         color: #F8FAFC !important;
-        font-size: 0.82rem !important;
+        font-size: 0.85rem !important;
     }
     [data-testid="stSidebar"] hr {
         border-color: #1E2E4A !important;
     }
     [data-testid="stSidebar"] .stCaption {
         color: #94A3B8 !important;
-        font-size: 0.72rem !important;
+        font-size: 0.76rem !important;
     }
 
     /* 사이드바 모든 버튼 강제 가독성 확보 */
@@ -182,9 +189,9 @@ st.markdown("""
     [data-testid="stSidebar"] [data-testid="stBaseButton-primary"] {
         background-color: #1E3A8A !important;
         border: 1px solid #3B82F6 !important;
-        border-radius: 4px !important;
+        border-radius: 5px !important;
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25) !important;
-        height: 34px !important;
+        height: 38px !important;
     }
 
     [data-testid="stSidebar"] button div,
@@ -193,7 +200,7 @@ st.markdown("""
     [data-testid="stSidebar"] button [data-testid="stMarkdownContainer"] p {
         color: #FFFFFF !important;
         font-weight: 700 !important;
-        font-size: 0.80rem !important;
+        font-size: 0.84rem !important;
         background: transparent !important;
         opacity: 1 !important;
         visibility: visible !important;
@@ -211,8 +218,8 @@ st.markdown("""
     [data-testid="stSidebar"] [data-testid="stFileUploader"] section {
         background-color: #13213B !important;
         border: 1.5px dashed #3B82F6 !important;
-        border-radius: 5px !important;
-        padding: 10px !important;
+        border-radius: 6px !important;
+        padding: 12px !important;
     }
     [data-testid="stSidebar"] [data-testid="stFileUploader"] button,
     [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] button,
@@ -220,18 +227,18 @@ st.markdown("""
         background-color: #1E3A8A !important;
         border: 1px solid #3B82F6 !important;
         color: #FFFFFF !important;
-        height: 30px !important;
+        height: 32px !important;
     }
     [data-testid="stSidebar"] [data-testid="stFileUploader"] button * {
         color: #FFFFFF !important;
         font-weight: 600 !important;
-        font-size: 0.75rem !important;
+        font-size: 0.78rem !important;
         background: transparent !important;
     }
     [data-testid="stSidebar"] [data-testid="stFileUploader"] small,
     [data-testid="stSidebar"] [data-testid="stFileUploader"] span {
         color: #94A3B8 !important;
-        font-size: 0.72rem !important;
+        font-size: 0.76rem !important;
         background: transparent !important;
     }
 
@@ -239,28 +246,28 @@ st.markdown("""
     [data-testid="stSidebar"] [data-testid="stExpander"] {
         background-color: #13213B !important;
         border: 1px solid #243656 !important;
-        border-radius: 4px !important;
+        border-radius: 5px !important;
     }
     [data-testid="stSidebar"] [data-testid="stExpander"] * {
         color: #F8FAFC !important;
-        font-size: 0.80rem !important;
+        font-size: 0.84rem !important;
     }
     [data-testid="stSidebar"] input {
         background-color: #0C1A30 !important;
         border: 1px solid #2D4165 !important;
         color: #FFFFFF !important;
         border-radius: 4px !important;
-        font-size: 0.80rem !important;
-        height: 32px !important;
+        font-size: 0.84rem !important;
+        height: 34px !important;
     }
 
-    /* 본문 폼 컴포넌트 마이크로 콤팩트 */
+    /* 본문 폼 컴포넌트 */
     div[data-baseweb="select"] > div, .stApp > div:not([data-testid="stSidebar"]) .stTextInput input {
         border-color: #CBD5E1 !important;
         border-radius: 4px !important;
         background-color: #FFFFFF !important;
-        font-size: 0.82rem !important;
-        min-height: 34px !important;
+        font-size: 0.88rem !important;
+        min-height: 38px !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -686,9 +693,9 @@ def load_all_data():
 if not st.session_state["logged_in"]:
     st.markdown("""
     <div style="padding: 20px 0 16px 0; border-bottom: 2px solid #1E3A8A; margin-bottom: 18px;">
-        <span style="font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em; color: #B45309; background: #FEF3C7; padding: 3px 8px; border-radius: 4px; border: 1px solid #FDE68A;">INTERNAL ACCESS ONLY</span>
-        <h1 style="font-size: 1.45rem; font-weight: 700; color: #0F172A; margin: 8px 0 4px 0; letter-spacing: -0.02em;">월간 미디어·광고 인텔리전스 리포트</h1>
-        <p style="font-size: 0.80rem; color: #64748B; margin: 0;">인가된 사내 사용자를 위한 전략 리서치 포털입니다. 등록된 계정으로 로그인해 주세요.</p>
+        <span style="font-size: 0.70rem; font-weight: 700; letter-spacing: 0.08em; color: #B45309; background: #FEF3C7; padding: 3px 8px; border-radius: 4px; border: 1px solid #FDE68A;">INTERNAL ACCESS ONLY</span>
+        <h1 style="font-size: 1.50rem; font-weight: 700; color: #0F172A; margin: 8px 0 4px 0; letter-spacing: -0.02em;">월간 미디어·광고 인텔리전스 리포트</h1>
+        <p style="font-size: 0.85rem; color: #64748B; margin: 0;">인가된 사내 사용자를 위한 전략 리서치 포털입니다. 등록된 계정으로 로그인해 주세요.</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -765,11 +772,11 @@ def get_stay_duration_str():
 
 # 사이드바 사용자 정보 카드
 st.sidebar.markdown(f"""
-<div style="background-color: #13213B; border: 1px solid #243656; border-radius: 4px; padding: 10px; margin-bottom: 10px;">
-    <div style="font-size: 0.65rem; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700;">USER PROFILE</div>
-    <div style="font-size: 0.90rem; font-weight: 700; color: #FFFFFF; margin-top: 2px;">{st.session_state['user_name']}</div>
-    <div style="font-size: 0.72rem; color: #60A5FA; margin-top: 2px;">Role: {st.session_state['role']}</div>
-    <div style="font-size: 0.68rem; color: #94A3B8; margin-top: 4px; border-top: 1px solid #1E2E4A; padding-top: 4px;">체류 시간: {get_stay_duration_str()}</div>
+<div style="background-color: #13213B; border: 1px solid #243656; border-radius: 5px; padding: 12px; margin-bottom: 12px;">
+    <div style="font-size: 0.68rem; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700;">USER PROFILE</div>
+    <div style="font-size: 0.95rem; font-weight: 700; color: #FFFFFF; margin-top: 3px;">{st.session_state['user_name']}</div>
+    <div style="font-size: 0.78rem; color: #60A5FA; margin-top: 2px;">Role: {st.session_state['role']}</div>
+    <div style="font-size: 0.72rem; color: #94A3B8; margin-top: 5px; border-top: 1px solid #1E2E4A; padding-top: 5px;">체류 시간: {get_stay_duration_str()}</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -841,7 +848,7 @@ else:
 # 마스터 전용 사이드바 메뉴
 if st.session_state["role"] == "admin":
     st.sidebar.markdown("---")
-    st.sidebar.markdown("<div style='font-size:0.68rem; color:#94A3B8; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:6px; font-weight:700;'>ADMIN CONSOLE</div>", unsafe_allow_html=True)
+    st.sidebar.markdown("<div style='font-size:0.72rem; color:#94A3B8; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:8px; font-weight:700;'>ADMIN CONSOLE</div>", unsafe_allow_html=True)
     
     if not st.session_state.get("admin_view", False):
         if st.sidebar.button("회원 관리 콘솔", type="primary", use_container_width=True):
@@ -893,10 +900,10 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
     c_head1, c_head2 = st.columns([4, 1])
     with c_head1:
         st.markdown("""
-        <div style="padding: 4px 0 12px 0; border-bottom: 2px solid #1E3A8A; margin-bottom: 16px;">
-            <span style="font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em; color: #B45309; background: #FEF3C7; padding: 2px 7px; border-radius: 4px; border: 1px solid #FDE68A;">EXECUTIVE ADMINISTRATION</span>
-            <h2 style="font-size: 1.35rem; font-weight: 700; color: #0F172A; margin: 6px 0 3px 0; letter-spacing: -0.02em;">회원 인가 및 보안 감사 콘솔</h2>
-            <p style="font-size: 0.80rem; color: #64748B; margin: 0;">가입 계정 인가 상태 및 사용자 활동 감사 내역을 정밀 모니터링합니다.</p>
+        <div style="padding: 4px 0 14px 0; border-bottom: 2px solid #1E3A8A; margin-bottom: 18px;">
+            <span style="font-size: 0.70rem; font-weight: 700; letter-spacing: 0.08em; color: #B45309; background: #FEF3C7; padding: 3px 8px; border-radius: 4px; border: 1px solid #FDE68A;">EXECUTIVE ADMINISTRATION</span>
+            <h2 style="font-size: 1.45rem; font-weight: 700; color: #0F172A; margin: 8px 0 4px 0; letter-spacing: -0.02em;">회원 인가 및 보안 감사 콘솔</h2>
+            <p style="font-size: 0.85rem; color: #64748B; margin: 0;">가입 계정 인가 상태 및 사용자 활동 감사 내역을 정밀 모니터링합니다.</p>
         </div>
         """, unsafe_allow_html=True)
     with c_head2:
@@ -948,7 +955,7 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
         h_col3.markdown("**권한**")
         h_col4.markdown("**상태**")
         h_col5.markdown("**관리 조작**")
-        st.markdown("<hr style='margin: 0.3rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
+        st.markdown("<hr style='margin: 0.4rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
         for u_id, info in list(all_users.items()):
             r_col1, r_col2, r_col3, r_col4, r_col5 = st.columns([1.5, 1.5, 1.5, 1.5, 2])
@@ -1016,17 +1023,17 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
     st.stop()
 
 # =========================================================================
-# 7. [메인 화면] 1. 상단 고정 붙박이(Sticky) 간판 헤더 (마이크로 콤팩트)
+# 7. [메인 화면] 1. 상단 고정 붙박이(Sticky) 간판 헤더
 # =========================================================================
 st.markdown("""
 <div class="sticky-main-header">
     <div>
-        <span style="font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em; color: #B45309; background: #FEF3C7; padding: 3px 8px; border-radius: 4px; border: 1px solid #FDE68A;">STRATEGIC INTELLIGENCE SUITE</span>
-        <h1 style="font-size: 1.45rem; font-weight: 800; color: #0F172A; margin: 4px 0 2px 0; letter-spacing: -0.025em;">월간 미디어 · 광고 업계 동향 대시보드</h1>
-        <p style="font-size: 0.78rem; color: #64748B; margin: 0;">2021년 9월 이후 축적된 월간 동향 보고서 통합 분석 인텔리전스</p>
+        <span style="font-size: 0.70rem; font-weight: 700; letter-spacing: 0.08em; color: #B45309; background: #FEF3C7; padding: 3px 8px; border-radius: 4px; border: 1px solid #FDE68A;">STRATEGIC INTELLIGENCE SUITE</span>
+        <h1 style="font-size: 1.55rem; font-weight: 800; color: #0F172A; margin: 6px 0 2px 0; letter-spacing: -0.025em;">월간 미디어 · 광고 업계 동향 대시보드</h1>
+        <p style="font-size: 0.85rem; color: #64748B; margin: 0;">2021년 9월 이후 축적된 월간 동향 보고서 통합 분석 인텔리전스</p>
     </div>
-    <div style="display: inline-flex; align-items: center; gap: 6px; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 5px 12px; border-radius: 20px; font-size: 0.72rem; color: #334155; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
-        <span style="display: inline-block; width: 6px; height: 6px; background-color: #10B981; border-radius: 50%;"></span>
+    <div style="display: inline-flex; align-items: center; gap: 7px; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 6px 14px; border-radius: 20px; font-size: 0.76rem; color: #334155; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+        <span style="display: inline-block; width: 7px; height: 7px; background-color: #10B981; border-radius: 50%;"></span>
         GitHub 동기화 활성
     </div>
 </div>
@@ -1035,11 +1042,10 @@ st.markdown("""
 # =========================================================================
 # 7. [메인 화면] 2. 전 카테고리 통합 검색: 완벽한 단일 폐쇄형 카드 블록
 # =========================================================================
-with st.container():
+with st.container(border=True):
     st.markdown("""
-    <div class="search-block-card">
-        <h3 style="margin: 0 0 3px 0; font-size: 1.05rem; font-weight: 700; color: #0F172A;">🔍 전 카테고리 통합 실시간 검색</h3>
-        <p style="margin: 0 0 10px 0; font-size: 0.78rem; color: #64748B;">키워드를 입력하면 모든 엑셀 데이터(주요 이슈, 경쟁 PT, 대행사 및 매체사 매출)에서 즉시 찾아냅니다.</p>
+    <h3 style="margin: 0 0 4px 0; font-size: 1.10rem; font-weight: 700; color: #0F172A;">🔍 전 카테고리 통합 실시간 검색</h3>
+    <p style="margin: 0 0 12px 0; font-size: 0.82rem; color: #64748B;">키워드를 입력하면 모든 엑셀 데이터(주요 이슈, 경쟁 PT, 대행사 및 매체사 매출)에서 즉시 찾아냅니다.</p>
     """, unsafe_allow_html=True)
     
     global_query = st.text_input(
@@ -1114,8 +1120,6 @@ with st.container():
 
         if tot_cnt == 0:
             st.warning(f"'{global_query}'에 대한 검색 결과가 없습니다.")
-            
-    st.markdown("</div>", unsafe_allow_html=True)
 
 # =========================================================================
 # 7. [메인 화면] 3. 서류철형 일체화 탭 (Folder-Tab Architecture)
@@ -1129,9 +1133,9 @@ tab1, tab2, tab3, tab4 = st.tabs([
 
 # 탭 1: PT 수주 현황
 with tab1:
-    st.markdown("<h3 style='font-size: 1.15rem; font-weight: 700; color: #0F172A; margin-bottom: 2px;'>광고회사 경쟁 PT 모니터링 및 수주 분석</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='font-size: 1.20rem; font-weight: 700; color: #0F172A; margin-bottom: 2px;'>광고회사 경쟁 PT 모니터링 및 수주 분석</h3>", unsafe_allow_html=True)
     st.caption("경쟁 PT 동향, 빌링 규모, 대행사별 수주 실적을 정밀 분석합니다.")
-    st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
     
     if not df_pt_unique.empty:
         available_years = sorted(list(set([str(y) for y in df_pt_unique["연도"].dropna() if str(y).isdigit()])), reverse=True)
@@ -1147,7 +1151,7 @@ with tab1:
         avg_b = view_pt[view_pt['빌링(억원)'] > 0]['빌링(억원)'].mean()
         m3.metric("평균 프로젝트 빌링", f"{avg_b:.1f}억원" if pd.notna(avg_b) else "집계중")
 
-        st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
         f_col1, f_col2, f_col3 = st.columns([2, 2, 2])
         with f_col1:
             search_query = st.text_input("광고주 또는 품목 검색", placeholder="예: 라이나, 카카오, 샴푸")
@@ -1174,9 +1178,9 @@ with tab1:
 
 # 탭 2: 매출 동향
 with tab2:
-    st.markdown("<h3 style='font-size: 1.15rem; font-weight: 700; color: #0F172A; margin-bottom: 2px;'>광고대행사 및 방송 매체사 매출 추이 & YoY 분석</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='font-size: 1.20rem; font-weight: 700; color: #0F172A; margin-bottom: 2px;'>광고대행사 및 방송 매체사 매출 추이 & YoY 분석</h3>", unsafe_allow_html=True)
     st.caption("대행사별 전파광고 매출 및 방송사(지상파/종편/유선) 광고 실적 통계입니다.")
-    st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
     
     view_mode = st.radio(
         "보기 방식",
@@ -1220,7 +1224,7 @@ with tab2:
                     plot_bgcolor="#FFFFFF",
                     paper_bgcolor="#FFFFFF",
                     font_family="Inter, Pretendard",
-                    font_size=11,
+                    font_size=12,
                     margin=dict(t=35, l=10, r=10, b=10)
                 )
                 st.plotly_chart(fig_ag, use_container_width=True)
@@ -1270,7 +1274,7 @@ with tab2:
                             plot_bgcolor="#FFFFFF",
                             paper_bgcolor="#FFFFFF",
                             font_family="Inter, Pretendard",
-                            font_size=11,
+                            font_size=12,
                             margin=dict(t=35, l=10, r=10, b=10)
                         )
                         st.plotly_chart(fig_yoy_ag, use_container_width=True)
@@ -1316,7 +1320,7 @@ with tab2:
                     plot_bgcolor="#FFFFFF",
                     paper_bgcolor="#FFFFFF",
                     font_family="Inter, Pretendard",
-                    font_size=11,
+                    font_size=12,
                     margin=dict(t=35, l=10, r=10, b=10)
                 )
                 st.plotly_chart(fig_tv, use_container_width=True)
@@ -1366,7 +1370,7 @@ with tab2:
                             plot_bgcolor="#FFFFFF",
                             paper_bgcolor="#FFFFFF",
                             font_family="Inter, Pretendard",
-                            font_size=11,
+                            font_size=12,
                             margin=dict(t=35, l=10, r=10, b=10)
                         )
                         st.plotly_chart(fig_yoy_tv, use_container_width=True)
@@ -1380,9 +1384,9 @@ with tab2:
 
 # 탭 3: 이슈 브리핑
 with tab3:
-    st.markdown("<h3 style='font-size: 1.15rem; font-weight: 700; color: #0F172A; margin-bottom: 2px;'>월별 업계 주요 이슈 및 정책 동향</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='font-size: 1.20rem; font-weight: 700; color: #0F172A; margin-bottom: 2px;'>월별 업계 주요 이슈 및 정책 동향</h3>", unsafe_allow_html=True)
     st.caption("방송통신 및 광고 업계의 월별 핵심 뉴스 및 정책 이슈를 모니터링합니다.")
-    st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
     
     if not df_issues.empty:
         selected_ym = st.selectbox("조회 연월", options=sorted(df_issues["연월"].unique(), reverse=True))
@@ -1397,9 +1401,9 @@ with tab3:
 
 # 탭 4: AI 동향 분석가
 with tab4:
-    st.markdown("<h3 style='font-size: 1.15rem; font-weight: 700; color: #0F172A; margin-bottom: 2px;'>AI 기반 인텔리전스 분석 어시스턴트</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='font-size: 1.20rem; font-weight: 700; color: #0F172A; margin-bottom: 2px;'>AI 기반 인텔리전스 분석 어시스턴트</h3>", unsafe_allow_html=True)
     st.caption("적재된 빅데이터를 바탕으로 구글 Gemini 모델이 질문에 실시간 답변합니다.")
-    st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
     
     if not api_key:
         st.warning("사이드바에 'Gemini API Key'를 설정하시면 실시간 AI 질의응답이 활성화됩니다.")
