@@ -184,6 +184,7 @@ st.markdown("""
         border-color: #60A5FA !important;
     }
 
+    /* 엑셀 파일 업로더 */
     [data-testid="stSidebar"] [data-testid="stFileUploader"] {
         background-color: transparent !important;
     }
@@ -484,26 +485,18 @@ def load_all_data():
                     issues_list.append({"연월": ym, "헤드라인": current_issue, "상세": text[1:].strip()})
             
             # B. [원 데이터 기반 완벽 수정] 광고회사 PT 현황 파싱
-            pt_header_indices = []
-            for i in range(len(df)):
-                row_str = " ".join([str(x).strip().replace(" ", "") for x in df.iloc[i].dropna().tolist()])
-                if "광고회사PT" in row_str or ("PT일자" in row_str and "광고주" in row_str):
-                    pt_header_indices.append(i)
-
             def clean_str(val):
                 if pd.isna(val): return ""
                 v = str(val).strip()
                 if v.lower() in ["nan", "none", "-"]: return ""
                 return v
 
-            # 엑셀 시트 내 모든 PT 섹션을 순회하며 정확한 헤더 매핑 수행
             for p_idx in range(len(df)):
                 row_cells = [clean_str(x) for x in df.iloc[p_idx].tolist()]
                 row_text = "".join(row_cells)
                 
                 # 헤더 행 발견 시
                 if "PT일자" in row_text and "광고주" in row_text:
-                    # 열 매핑 딕셔너리 생성
                     col_map = {
                         "date": 0, "client": 1, "product": 2, "billing": 3,
                         "participants": 4, "incumbent": 6, "winner": 7, "memo": 8
@@ -520,12 +513,10 @@ def load_all_data():
                         elif "선정사" in c_clean or "결과" in c_clean: col_map["winner"] = c_i
                         elif "비고" in c_clean or "메모" in c_clean: col_map["memo"] = c_i
 
-                    # 데이터 행 스캔
                     for r_i in range(p_idx + 1, len(df)):
                         sub_row = df.iloc[r_i].tolist()
                         row_full_str = " ".join([clean_str(x) for x in sub_row])
                         
-                        # 다른 섹션 진입 시 중단
                         if any(stop_kw in row_full_str for stop_kw in ["광고회사 전파광고", "대행사 전파광고", "지상파 매출", "종합/유선채널"]):
                             break
                         if "PT일자" in row_full_str and "광고주" in row_full_str:
@@ -537,7 +528,6 @@ def load_all_data():
                         if "광고회사" in client_val or "종합편" in client_val:
                             continue
 
-                        # 날짜 정제 (00:00:00 제거)
                         date_cell = sub_row[col_map["date"]] if col_map["date"] < len(sub_row) else ""
                         date_str = ""
                         if pd.notna(date_cell):
@@ -548,7 +538,6 @@ def load_all_data():
                                 if len(date_str) >= 10 and date_str[:10].replace("-", "").isdigit():
                                     date_str = date_str[:10]
 
-                        # 참여사/대행사 잘못 읽힌 경우 필터
                         excluded_agencies = ["TBWA", "SM C&C", "HS AD", "차이커뮤니케이션", "제일기획", "이노션", "대홍기획", "Dentsu", "덴츠"]
                         if any(ag in date_str for ag in excluded_agencies) or any(ag in client_val for ag in excluded_agencies):
                             continue
@@ -567,7 +556,6 @@ def load_all_data():
                             except:
                                 pass
 
-                        # 원 데이터 기준 완벽 분리 추출
                         product_val = clean_str(sub_row[col_map["product"]]) if col_map["product"] < len(sub_row) else ""
                         participants_val = clean_str(sub_row[col_map["participants"]]) if col_map["participants"] < len(sub_row) else ""
                         incumbent_val = clean_str(sub_row[col_map["incumbent"]]) if col_map["incumbent"] < len(sub_row) else ""
@@ -1300,10 +1288,10 @@ with body_container:
                             )
                             st.plotly_chart(fig_yoy_ag, use_container_width=True)
                             st.dataframe(df_yoy_ag, hide_index=True, use_container_width=True)
+                        else:
+                            st.info(f"{prev_year}년 또는 {yoy_base_year}년 데이터가 부족합니다.")
                     else:
-                        st.info(f"{prev_year}년 또는 {yoy_base_year}년 데이터가 부족합니다.")
-                else:
-                    st.caption("축적된 연도 데이터가 2개 이상일 때 YoY 분석이 가능합니다.")
+                        st.caption("축적된 연도 데이터가 2개 이상일 때 YoY 분석이 가능합니다.")
             else:
                 st.info("대행사 매출 집계 중")
 
@@ -1396,10 +1384,10 @@ with body_container:
                             )
                             st.plotly_chart(fig_yoy_tv, use_container_width=True)
                             st.dataframe(df_yoy_tv, hide_index=True, use_container_width=True)
+                        else:
+                            st.info(f"{prev_tv_year}년 또는 {yoy_tv_base}년 데이터가 부족합니다.")
                     else:
-                        st.info(f"{prev_tv_year}년 또는 {yoy_tv_base}년 데이터가 부족합니다.")
-                else:
-                    st.caption("축적된 연도 데이터가 2개 이상일 때 YoY 분석이 가능합니다.")
+                        st.caption("축적된 연도 데이터가 2개 이상일 때 YoY 분석이 가능합니다.")
             else:
                 st.info("방송사 매출 집계 중")
 
