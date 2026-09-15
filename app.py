@@ -490,7 +490,7 @@ def load_all_data():
                 elif current_issue and text.startswith("-"):
                     issues_list.append({"연월": ym, "헤드라인": current_issue, "상세": text[1:].strip()})
             
-            # B. [원 데이터 기반 공백 무관 완벽 파싱] 광고회사 PT 현황
+            # B. [원 데이터 기반 공백 무관 완벽 파싱 및 정크 원천 차단] 광고회사 PT 현황
             for p_idx in range(len(df)):
                 row_cells = [clean_str(x) for x in df.iloc[p_idx].tolist()]
                 row_text_no_space = "".join(row_cells).replace(" ", "")
@@ -516,20 +516,23 @@ def load_all_data():
                     for r_i in range(p_idx + 1, len(df)):
                         sub_row = df.iloc[r_i].tolist()
                         row_full_str = " ".join([clean_str(x) for x in sub_row])
+                        row_full_nospace = row_full_str.replace(" ", "")
                         
-                        if any(stop_kw in row_full_str for stop_kw in ["광고회사 전파광고", "대행사 전파광고", "지상파 매출", "종합/유선채널"]):
+                        # 다음 섹션 (전파광고 매출, 방송사 매출 등) 진입 시 즉시 중단
+                        if any(stop_kw in row_full_nospace for stop_kw in ["전파", "지상파", "종편", "방송사매출", "매출_", "공중파"]):
                             break
-                        sub_row_no_space = "".join([clean_str(x) for x in sub_row]).replace(" ", "")
-                        if "PT일자" in sub_row_no_space and "광고주" in sub_row_no_space:
+                        if "PT일자" in row_full_nospace and "광고주" in row_full_nospace:
                             break
                         
                         client_val = clean_str(sub_row[col_map["client"]]) if col_map["client"] < len(sub_row) else ""
-                        if not client_val or client_val in ["광고주", "합계", "소계", "Total"]:
+                        date_cell = sub_row[col_map["date"]] if col_map["date"] < len(sub_row) else ""
+                        
+                        # 1. 정크 광고주 행 필터 (SUM, 합산, 단위, WPP 등)
+                        if not client_val or client_val in ["광고주", "합계", "소계", "Total", "SUM"]:
                             continue
-                        if "광고회사" in client_val or "종합편" in client_val:
+                        if any(junk_kw in client_val for junk_kw in ["광고회사", "종합편", "단위", "합산", "계수", "WPP Media", "Group M"]):
                             continue
 
-                        date_cell = sub_row[col_map["date"]] if col_map["date"] < len(sub_row) else ""
                         date_str = ""
                         if pd.notna(date_cell):
                             if isinstance(date_cell, (datetime, pd.Timestamp)):
@@ -538,6 +541,10 @@ def load_all_data():
                                 date_str = clean_str(date_cell)
                                 if len(date_str) >= 10 and date_str[:10].replace("-", "").isdigit():
                                     date_str = date_str[:10]
+
+                        # 2. 날짜 유효성 검사 (빈칸이거나 단순 숫자, SUM 표기 등 배제)
+                        if not date_str or date_str.isdigit() or any(k in date_str for k in ["SUM", "단위", "WPP"]):
+                            continue
 
                         excluded_agencies = ["TBWA", "SM C&C", "HS AD", "차이커뮤니케이션", "제일기획", "이노션", "대홍기획", "Dentsu", "덴츠"]
                         if any(ag in date_str for ag in excluded_agencies) or any(ag in client_val for ag in excluded_agencies):
