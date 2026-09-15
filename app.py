@@ -24,10 +24,9 @@ GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", None)
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "Mickie-Park/media-trend")
 FILE_PATH = "users.json"
 
-# --- 2. Option C: 하이엔드 컨설팅 리포트 테마 + 업로더 버튼 완전 복원 CSS ---
+# --- 2. Option C: 상단 고정 간판 헤더 + 독립 검색 블록 + ON/OFF 일체형 탭 CSS ---
 st.markdown("""
 <style>
-    /* 1. Inter + Pretendard 글로벌 금융/컨설팅 서체 (콤팩트 스케일) */
     @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
     @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
     
@@ -38,13 +37,98 @@ st.markdown("""
         font-size: 0.93rem;
     }
 
-    /* 2. 메인 캔버스: 웜 오프화이트 */
+    /* 메인 캔버스 톤 */
     .stApp {
-        background-color: #FAF9F6;
+        background-color: #F1F5F9;
         color: #1E293B;
     }
 
-    /* 3. 사이드바 베이스: 딥 옥스퍼드 미드나이트 */
+    /* ========================================================= */
+    /* 1. 상단 고정 붙박이(Sticky) 간판 헤더                      */
+    /* ========================================================= */
+    .sticky-main-header {
+        position: -webkit-sticky;
+        position: sticky;
+        top: 0;
+        z-index: 999;
+        background: #FFFFFF;
+        border-bottom: 3px solid #1E3A8A;
+        padding: 14px 24px;
+        margin-left: -5rem;
+        margin-right: -5rem;
+        margin-top: -3.5rem;
+        margin-bottom: 24px;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    /* ========================================================= */
+    /* 2. 전 카테고리 통합 검색 독립 블록 카드                   */
+    /* ========================================================= */
+    .search-block-container {
+        background: #FFFFFF;
+        border: 1px solid #CBD5E1;
+        border-left: 5px solid #2563EB;
+        border-radius: 8px;
+        padding: 20px 24px 16px 24px;
+        margin-bottom: 26px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+    }
+
+    /* ========================================================= */
+    /* 3. [ON / OFF] 고대비 카테고리 탭 디자인                    */
+    /* ========================================================= */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 6px;
+        border-bottom: none !important;
+        background-color: transparent !important;
+        padding-left: 2px;
+        margin-bottom: -2px; /* 내용 영역과 밀착 일체화 */
+    }
+
+    /* OFF 탭: 어둡고 차분한 다크 슬레이트 (가독성 유지) */
+    .stTabs [data-baseweb="tab"] {
+        background-color: #334155 !important;
+        color: #CBD5E1 !important;
+        border: 1px solid #475569 !important;
+        border-bottom: none !important;
+        border-radius: 8px 8px 0 0 !important;
+        height: 46px;
+        font-size: 0.92rem !important;
+        font-weight: 600 !important;
+        padding: 0 22px !important;
+        transition: all 0.2s ease-in-out;
+    }
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: #1E293B !important;
+        color: #FFFFFF !important;
+    }
+
+    /* ON 탭: 밝고 선명한 딥 옥스퍼드 블루 + 화이트 텍스트 + 골드 탑 바 */
+    .stTabs [aria-selected="true"] {
+        background-color: #1E3A8A !important;
+        color: #FFFFFF !important;
+        border: 1px solid #1E3A8A !important;
+        border-top: 4px solid #F59E0B !important; /* 골드 하이라이트 */
+        border-bottom: none !important;
+        font-weight: 700 !important;
+        box-shadow: 0 -3px 8px rgba(30, 58, 138, 0.25) !important;
+    }
+
+    /* 탭 하단 내용 영역(Content Panel) 일체화 카드 */
+    .stTabs [data-baseweb="tab-panel"] {
+        background-color: #FFFFFF;
+        border: 2px solid #1E3A8A;
+        border-radius: 0 8px 8px 8px;
+        padding: 24px;
+        box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+    }
+
+    /* ========================================================= */
+    /* 4. 사이드바 UI 버그 완전 해결 (버튼 및 업로더)             */
+    /* ========================================================= */
     [data-testid="stSidebar"] {
         background-color: #0C1A30 !important;
         border-right: 1px solid #1E2E4A !important;
@@ -61,7 +145,7 @@ st.markdown("""
         font-size: 0.76rem !important;
     }
 
-    /* 4. 사이드바 버튼 기본 스타일 */
+    /* 사이드바 모든 버튼 강제 가독성 확보 */
     [data-testid="stSidebar"] button,
     [data-testid="stSidebar"] .stButton button,
     [data-testid="stSidebar"] [data-testid="baseButton-primary"],
@@ -91,9 +175,7 @@ st.markdown("""
         border-color: #60A5FA !important;
     }
 
-    /* ========================================================= */
-    /* 5. [핵심 교정] 엑셀 파일 업로더 흰 박스 완전 박멸 및 텍스트 복원 */
-    /* ========================================================= */
+    /* 엑셀 파일 업로더 흰 박스 제거 */
     [data-testid="stSidebar"] [data-testid="stFileUploader"] {
         background-color: transparent !important;
     }
@@ -105,37 +187,22 @@ st.markdown("""
         padding: 12px !important;
     }
 
-    /* 업로더 내부 버튼 (흰색 박스를 네이비/블루 버튼으로 교체) */
     [data-testid="stSidebar"] [data-testid="stFileUploader"] button,
     [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] button,
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] [data-testid="stBaseButton-secondary"],
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] [data-testid="baseButton-secondary"] {
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] [data-testid="stBaseButton-secondary"] {
         background-color: #1E3A8A !important;
         border: 1px solid #3B82F6 !important;
         color: #FFFFFF !important;
     }
 
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] button:hover {
-        background-color: #2563EB !important;
-        border-color: #60A5FA !important;
-    }
-
-    /* 업로더 버튼 내부 텍스트(Browse files) 및 아이콘 강제 화이트 */
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] button *,
-    [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] button * {
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] button * {
         color: #FFFFFF !important;
-        fill: #FFFFFF !important;
         font-weight: 600 !important;
-        font-size: 0.8rem !important;
         background: transparent !important;
-        opacity: 1 !important;
-        visibility: visible !important;
     }
 
-    /* 파일 규격 및 안내 문구 */
     [data-testid="stSidebar"] [data-testid="stFileUploader"] small,
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] span,
-    [data-testid="stSidebar"] [data-testid="stFileUploaderDropzoneInstructions"] * {
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] span {
         color: #94A3B8 !important;
         background: transparent !important;
     }
@@ -158,15 +225,15 @@ st.markdown("""
     }
 
     /* ========================================================= */
-    /* 6. 메인 본문 지표 카드 및 탭 (컨설팅 리포트 콤팩트 스타일) */
+    /* 5. 지표 카드 및 인풋 컴포넌트                             */
     /* ========================================================= */
     [data-testid="stMetric"] {
-        background-color: #FFFFFF;
+        background-color: #F8FAFC;
         padding: 14px 18px;
-        border-radius: 5px;
-        border: 1px solid #E2E8F0;
-        border-left: 3.5px solid #1E3A8A;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+        border-radius: 6px;
+        border: 1px solid #CBD5E1;
+        border-left: 4px solid #1E3A8A;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
     }
     [data-testid="stMetricLabel"] {
         font-size: 0.74rem !important;
@@ -182,51 +249,11 @@ st.markdown("""
         letter-spacing: -0.02em;
     }
 
-    /* 탭 스타일 */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 10px;
-        border-bottom: 2px solid #E2E8F0;
-        background-color: transparent;
-    }
-    .stTabs [data-baseweb="tab"] {
-        height: 42px;
-        font-size: 0.88rem;
-        font-weight: 600;
-        color: #64748B;
-        border-radius: 0;
-        padding: 0 14px;
-        background-color: transparent !important;
-    }
-    .stTabs [aria-selected="true"] {
-        color: #1E3A8A !important;
-        border-bottom: 2px solid #1E3A8A !important;
-        background-color: transparent !important;
-    }
-
-    /* 메인 화면 일반 버튼 */
-    .stApp > div:not([data-testid="stSidebar"]) button[kind="primary"] {
-        background-color: #1E3A8A !important;
-        border-color: #1E3A8A !important;
-        color: #FFFFFF !important;
-        border-radius: 4px !important;
-        font-weight: 600 !important;
-        font-size: 0.85rem !important;
-    }
-    .stApp > div:not([data-testid="stSidebar"]) button[kind="secondary"] {
-        background-color: #FFFFFF !important;
-        border: 1px solid #CBD5E1 !important;
-        color: #334155 !important;
-        border-radius: 4px !important;
-        font-size: 0.85rem !important;
-    }
-
-    /* 본문 아코디언 및 인풋 */
     .stApp > div:not([data-testid="stSidebar"]) [data-testid="stExpander"] {
         background-color: #FFFFFF;
-        border: 1px solid #E2E8F0 !important;
-        border-radius: 5px !important;
+        border: 1px solid #CBD5E1 !important;
+        border-radius: 6px !important;
         margin-bottom: 10px;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
     }
     div[data-baseweb="select"] > div, .stApp > div:not([data-testid="stSidebar"]) .stTextInput input {
         border-color: #CBD5E1 !important;
@@ -723,7 +750,7 @@ if not st.session_state["logged_in"]:
                     st.success("회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인하실 수 있습니다.")
     st.stop()
 
-# --- 5. 로그인 성공 후 공통 제어판 ---
+# --- 5. 로그인 성공 후 사이드바 제어판 ---
 df_issues, df_tv, df_pt, df_agency, loaded_files = load_all_data()
 df_pt_unique = df_pt.drop_duplicates(subset=["PT일자", "광고주", "품목"]) if not df_pt.empty else pd.DataFrame()
 
@@ -745,7 +772,7 @@ st.sidebar.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# 로그아웃 버튼 (Primary 타입으로 선명한 파란색 바탕 + 흰색 볼드 텍스트 고정)
+# 로그아웃 버튼
 if st.sidebar.button("로그아웃", type="primary", use_container_width=True):
     log_activity(
         st.session_state["username"], 
@@ -988,101 +1015,110 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
     st.stop()
 
 # =========================================================================
-# 7. [메인 대시보드 화면] - Inter 콤팩트 타이포그래피 헤더
+# 7. [메인 화면] 1. 상단 고정 붙박이(Sticky) 간판 헤더
 # =========================================================================
 st.markdown("""
-<div style="padding: 2px 0 18px 0; border-bottom: 2px solid #1E3A8A; margin-bottom: 20px;">
-    <div style="display: flex; align-items: center; justify-content: space-between;">
-        <div>
-            <span style="font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; color: #B45309; background: #FEF3C7; padding: 3px 8px; border-radius: 4px; border: 1px solid #FDE68A;">STRATEGIC INTELLIGENCE REPORT</span>
-            <h1 style="font-size: 1.55rem; font-weight: 700; color: #0F172A; margin: 8px 0 4px 0; letter-spacing: -0.02em;">월간 미디어 · 광고 업계 동향 대시보드</h1>
-            <p style="font-size: 0.84rem; color: #64748B; margin: 0;">2021년 9월 이후 축적된 월간 동향 보고서 통합 분석 인텔리전스</p>
-        </div>
-        <div style="display: inline-flex; align-items: center; gap: 6px; background: #FFFFFF; border: 1px solid #E2E8F0; padding: 5px 12px; border-radius: 20px; font-size: 0.74rem; color: #475569; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
-            <span style="display: inline-block; width: 6px; height: 6px; background-color: #10B981; border-radius: 50%;"></span>
-            GitHub 동기화 활성
-        </div>
+<div class="sticky-main-header">
+    <div>
+        <span style="font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; color: #B45309; background: #FEF3C7; padding: 4px 10px; border-radius: 4px; border: 1px solid #FDE68A;">STRATEGIC INTELLIGENCE SUITE</span>
+        <h1 style="font-size: 1.65rem; font-weight: 800; color: #0F172A; margin: 6px 0 2px 0; letter-spacing: -0.025em;">월간 미디어 · 광고 업계 동향 대시보드</h1>
+        <p style="font-size: 0.82rem; color: #64748B; margin: 0;">2021년 9월 이후 축적된 월간 동향 보고서 통합 분석 인텔리전스</p>
+    </div>
+    <div style="display: inline-flex; align-items: center; gap: 7px; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 7px 14px; border-radius: 20px; font-size: 0.76rem; color: #334155; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+        <span style="display: inline-block; width: 7px; height: 7px; background-color: #10B981; border-radius: 50%;"></span>
+        GitHub 동기화 활성
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-# 통합 검색 영역
-st.markdown("#### 전 카테고리 통합 검색")
-global_query = st.text_input(
-    "키워드를 입력하면 모든 엑셀 데이터(이슈, PT, 대행사/매체사 매출)에서 실시간으로 찾아냅니다.",
-    placeholder="예: OTT, 현대, 제일기획, 카카오, 디즈니 등 입력 후 Enter"
-).strip()
-
-if global_query:
-    matched_issues = pd.DataFrame()
-    if not df_issues.empty:
-        cond_issue = (
-            df_issues["헤드라인"].str.contains(global_query, case=False, na=False) |
-            df_issues["상세"].str.contains(global_query, case=False, na=False)
-        )
-        matched_issues = df_issues[cond_issue]
-        
-    matched_pt = pd.DataFrame()
-    if not df_pt_unique.empty:
-        cond_pt = (
-            df_pt_unique["광고주"].str.contains(global_query, case=False, na=False) |
-            df_pt_unique["품목"].str.contains(global_query, case=False, na=False) |
-            df_pt_unique["선정사"].str.contains(global_query, case=False, na=False) |
-            df_pt_unique["참여사"].str.contains(global_query, case=False, na=False) |
-            df_pt_unique["기존사"].str.contains(global_query, case=False, na=False) |
-            df_pt_unique["메모"].str.contains(global_query, case=False, na=False)
-        )
-        matched_pt = df_pt_unique[cond_pt]
-        
-    matched_agency = pd.DataFrame()
-    if not df_agency.empty:
-        matched_agency = df_agency[df_agency["대행사"].str.contains(global_query, case=False, na=False)]
-        
-    matched_tv = pd.DataFrame()
-    if not df_tv.empty:
-        matched_tv = df_tv[df_tv["채널"].str.contains(global_query, case=False, na=False)]
-
-    tot_cnt = len(matched_issues) + len(matched_pt) + len(matched_agency) + len(matched_tv)
-    st.info(f"검색 결과: 총 **{tot_cnt}건** 발견")
+# =========================================================================
+# 7. [메인 화면] 2. 전 카테고리 통합 검색 독립 블록 (Search Card)
+# =========================================================================
+with st.container():
+    st.markdown("""
+    <div class="search-block-container">
+        <h3 style="margin: 0 0 4px 0; font-size: 1.15rem; font-weight: 700; color: #0F172A;">🔍 전 카테고리 통합 실시간 검색</h3>
+        <p style="margin: 0 0 12px 0; font-size: 0.82rem; color: #64748B;">키워드를 입력하면 모든 데이터(주요 이슈, 경쟁 PT, 대행사 및 매체사 매출)에서 즉시 찾아냅니다.</p>
+    """, unsafe_allow_html=True)
     
-    sc1, sc2, sc3, sc4 = st.columns(4)
-    sc1.metric("주요 이슈", f"{len(matched_issues)}건")
-    sc2.metric("경쟁 PT 현황", f"{len(matched_pt)}건")
-    sc3.metric("대행사 매출 데이터", f"{len(matched_agency)}건")
-    sc4.metric("방송 매체사 데이터", f"{len(matched_tv)}건")
-    
-    if len(matched_issues) > 0:
-        with st.expander(f"주요 이슈 검색 결과 ({len(matched_issues)}건)", expanded=True):
-            for _, row in matched_issues.iterrows():
-                headline_text = f"**[{row['연월']}]** {row['헤드라인']}"
-                if row['상세']:
-                    st.markdown(f"- {headline_text}<br>&nbsp;&nbsp;&nbsp;&nbsp;↳ *{row['상세']}*", unsafe_allow_html=True)
-                else:
-                    st.markdown(f"- {headline_text}")
+    global_query = st.text_input(
+        "통합 검색어 입력",
+        placeholder="예: OTT, 현대, 제일기획, 카카오, 디즈니 등 입력 후 Enter",
+        label_visibility="collapsed"
+    ).strip()
 
-    if len(matched_pt) > 0:
-        with st.expander(f"PT 수주 현황 검색 결과 ({len(matched_pt)}건)", expanded=True):
-            st.dataframe(
-                matched_pt[["발행연월", "PT일자", "광고주", "품목", "빌링_원문", "참여사", "선정사", "메모"]].rename(columns={"빌링_원문": "빌링(억원)"}),
-                hide_index=True,
-                use_container_width=True
+    if global_query:
+        matched_issues = pd.DataFrame()
+        if not df_issues.empty:
+            cond_issue = (
+                df_issues["헤드라인"].str.contains(global_query, case=False, na=False) |
+                df_issues["상세"].str.contains(global_query, case=False, na=False)
             )
+            matched_issues = df_issues[cond_issue]
+            
+        matched_pt = pd.DataFrame()
+        if not df_pt_unique.empty:
+            cond_pt = (
+                df_pt_unique["광고주"].str.contains(global_query, case=False, na=False) |
+                df_pt_unique["품목"].str.contains(global_query, case=False, na=False) |
+                df_pt_unique["선정사"].str.contains(global_query, case=False, na=False) |
+                df_pt_unique["참여사"].str.contains(global_query, case=False, na=False) |
+                df_pt_unique["기존사"].str.contains(global_query, case=False, na=False) |
+                df_pt_unique["메모"].str.contains(global_query, case=False, na=False)
+            )
+            matched_pt = df_pt_unique[cond_pt]
+            
+        matched_agency = pd.DataFrame()
+        if not df_agency.empty:
+            matched_agency = df_agency[df_agency["대행사"].str.contains(global_query, case=False, na=False)]
+            
+        matched_tv = pd.DataFrame()
+        if not df_tv.empty:
+            matched_tv = df_tv[df_tv["채널"].str.contains(global_query, case=False, na=False)]
 
-    if len(matched_agency) > 0 or len(matched_tv) > 0:
-        with st.expander(f"대행사 / 매체사 관련 검색 결과 ({len(matched_agency) + len(matched_tv)}건)", expanded=False):
-            if len(matched_agency) > 0:
-                st.caption("대행사 매출 데이터")
-                st.dataframe(matched_agency[["연월", "대행사", "매출(억원)"]], hide_index=True, use_container_width=True)
-            if len(matched_tv) > 0:
-                st.caption("방송 매체사 매출 데이터")
-                st.dataframe(matched_tv[["연월", "구분", "채널", "매출(억원)"]], hide_index=True, use_container_width=True)
+        tot_cnt = len(matched_issues) + len(matched_pt) + len(matched_agency) + len(matched_tv)
+        st.info(f"검색 결과: 총 **{tot_cnt}건** 발견")
+        
+        sc1, sc2, sc3, sc4 = st.columns(4)
+        sc1.metric("주요 이슈", f"{len(matched_issues)}건")
+        sc2.metric("경쟁 PT 현황", f"{len(matched_pt)}건")
+        sc3.metric("대행사 매출 데이터", f"{len(matched_agency)}건")
+        sc4.metric("방송 매체사 데이터", f"{len(matched_tv)}건")
+        
+        if len(matched_issues) > 0:
+            with st.expander(f"주요 이슈 검색 결과 ({len(matched_issues)}건)", expanded=True):
+                for _, row in matched_issues.iterrows():
+                    headline_text = f"**[{row['연월']}]** {row['헤드라인']}"
+                    if row['상세']:
+                        st.markdown(f"- {headline_text}<br>&nbsp;&nbsp;&nbsp;&nbsp;↳ *{row['상세']}*", unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"- {headline_text}")
 
-    if tot_cnt == 0:
-        st.warning(f"'{global_query}'에 대한 검색 결과가 없습니다.")
-    
-    st.markdown("---")
+        if len(matched_pt) > 0:
+            with st.expander(f"PT 수주 현황 검색 결과 ({len(matched_pt)}건)", expanded=True):
+                st.dataframe(
+                    matched_pt[["발행연월", "PT일자", "광고주", "품목", "빌링_원문", "참여사", "선정사", "메모"]].rename(columns={"빌링_원문": "빌링(억원)"}),
+                    hide_index=True,
+                    use_container_width=True
+                )
 
-# 4개 메인 탭 영역
+        if len(matched_agency) > 0 or len(matched_tv) > 0:
+            with st.expander(f"대행사 / 매체사 관련 검색 결과 ({len(matched_agency) + len(matched_tv)}건)", expanded=False):
+                if len(matched_agency) > 0:
+                    st.caption("대행사 매출 데이터")
+                    st.dataframe(matched_agency[["연월", "대행사", "매출(억원)"]], hide_index=True, use_container_width=True)
+                if len(matched_tv) > 0:
+                    st.caption("방송 매체사 매출 데이터")
+                    st.dataframe(matched_tv[["연월", "구분", "채널", "매출(억원)"]], hide_index=True, use_container_width=True)
+
+        if tot_cnt == 0:
+            st.warning(f"'{global_query}'에 대한 검색 결과가 없습니다.")
+            
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# =========================================================================
+# 7. [메인 화면] 3. ON / OFF 버튼 탭 & 일체형 배경 바디
+# =========================================================================
 tab1, tab2, tab3, tab4 = st.tabs([
     "광고회사 PT 수주 현황", 
     "대행사/매체사 매출 동향", 
@@ -1092,7 +1128,10 @@ tab1, tab2, tab3, tab4 = st.tabs([
 
 # 탭 1: PT 수주 현황
 with tab1:
-    st.markdown("#### 광고회사 경쟁 PT 모니터링 및 수주 분석")
+    st.markdown("<h3 style='font-size: 1.3rem; font-weight: 700; color: #0F172A; margin-bottom: 4px;'>광고회사 경쟁 PT 모니터링 및 수주 분석</h3>", unsafe_allow_html=True)
+    st.caption("경쟁 PT 동향, 빌링 규모, 대행사별 수주 실적을 정밀 분석합니다.")
+    st.markdown("<br>", unsafe_allow_html=True)
+    
     if not df_pt_unique.empty:
         available_years = sorted(list(set([str(y) for y in df_pt_unique["연도"].dropna() if str(y).isdigit()])), reverse=True)
         selected_pt_year = st.selectbox("PT 연도 선택", ["전체 연도"] + available_years)
@@ -1134,7 +1173,9 @@ with tab1:
 
 # 탭 2: 매출 동향
 with tab2:
-    st.markdown("#### 광고대행사 및 방송 매체사 매출 추이 & YoY 분석")
+    st.markdown("<h3 style='font-size: 1.3rem; font-weight: 700; color: #0F172A; margin-bottom: 4px;'>광고대행사 및 방송 매체사 매출 추이 & YoY 분석</h3>", unsafe_allow_html=True)
+    st.caption("대행사별 전파광고 매출 및 방송사(지상파/종편/유선) 광고 실적 통계입니다.")
+    st.markdown("<br>", unsafe_allow_html=True)
     
     view_mode = st.radio(
         "보기 방식",
@@ -1175,8 +1216,8 @@ with tab2:
                     color_discrete_sequence=["#1E3A8A"]
                 )
                 fig_ag.update_layout(
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="#FFFFFF",
+                    paper_bgcolor="#FFFFFF",
                     font_family="Inter, Pretendard",
                     margin=dict(t=40, l=10, r=10, b=10)
                 )
@@ -1224,8 +1265,8 @@ with tab2:
                             title=f"{prev_year}년 vs {yoy_base_year}년 월별 매출 비교"
                         )
                         fig_yoy_ag.update_layout(
-                            plot_bgcolor="rgba(0,0,0,0)",
-                            paper_bgcolor="rgba(0,0,0,0)",
+                            plot_bgcolor="#FFFFFF",
+                            paper_bgcolor="#FFFFFF",
                             font_family="Inter, Pretendard",
                             margin=dict(t=40, l=10, r=10, b=10)
                         )
@@ -1269,8 +1310,8 @@ with tab2:
                     color_discrete_sequence=["#1E3A8A"]
                 )
                 fig_tv.update_layout(
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="#FFFFFF",
+                    paper_bgcolor="#FFFFFF",
                     font_family="Inter, Pretendard",
                     margin=dict(t=40, l=10, r=10, b=10)
                 )
@@ -1318,8 +1359,8 @@ with tab2:
                             title=f"{prev_tv_year}년 vs {yoy_tv_base}년 월별 매출 비교"
                         )
                         fig_yoy_tv.update_layout(
-                            plot_bgcolor="rgba(0,0,0,0)",
-                            paper_bgcolor="rgba(0,0,0,0)",
+                            plot_bgcolor="#FFFFFF",
+                            paper_bgcolor="#FFFFFF",
                             font_family="Inter, Pretendard",
                             margin=dict(t=40, l=10, r=10, b=10)
                         )
@@ -1334,7 +1375,10 @@ with tab2:
 
 # 탭 3: 이슈 브리핑
 with tab3:
-    st.markdown("#### 월별 업계 주요 이슈 및 정책 동향")
+    st.markdown("<h3 style='font-size: 1.3rem; font-weight: 700; color: #0F172A; margin-bottom: 4px;'>월별 업계 주요 이슈 및 정책 동향</h3>", unsafe_allow_html=True)
+    st.caption("방송통신 및 광고 업계의 월별 핵심 뉴스 및 정책 이슈를 모니터링합니다.")
+    st.markdown("<br>", unsafe_allow_html=True)
+    
     if not df_issues.empty:
         selected_ym = st.selectbox("조회 연월", options=sorted(df_issues["연월"].unique(), reverse=True))
         ym_issues = df_issues[df_issues["연월"] == selected_ym]
@@ -1348,7 +1392,10 @@ with tab3:
 
 # 탭 4: AI 동향 분석가
 with tab4:
-    st.markdown("#### AI 기반 인텔리전스 분석 어시스턴트")
+    st.markdown("<h3 style='font-size: 1.3rem; font-weight: 700; color: #0F172A; margin-bottom: 4px;'>AI 기반 인텔리전스 분석 어시스턴트</h3>", unsafe_allow_html=True)
+    st.caption("적재된 빅데이터를 바탕으로 구글 Gemini 모델이 질문에 실시간 답변합니다.")
+    st.markdown("<br>", unsafe_allow_html=True)
+    
     if not api_key:
         st.warning("사이드바에 'Gemini API Key'를 설정하시면 실시간 AI 질의응답이 활성화됩니다.")
     else:
