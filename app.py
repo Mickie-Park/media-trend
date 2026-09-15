@@ -24,10 +24,10 @@ GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", None)
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "Mickie-Park/media-trend")
 FILE_PATH = "users.json"
 
-# --- 2. Option C: 서류철형(Folder-Tab) 일체화 + 검색 블록 일체화 CSS ---
+# --- 2. Option C: 미리보기 100% 일치 서류철형 탭 + 검색 블록 완전 일체화 CSS ---
 st.markdown("""
 <style>
-    /* 1. 글로벌 표준 Inter + Pretendard 타이포그래피 (안정적인 가독성 규격) */
+    /* 1. 표준 글로벌 금융/컨설팅 서체 */
     @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
     @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
     
@@ -35,13 +35,13 @@ st.markdown("""
         font-family: "Inter", "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
         font-feature-settings: "cv02", "cv03", "cv04", "cv11", "tnum" !important;
         letter-spacing: -0.015em;
-        font-size: 0.90rem !important; /* 너무 작지 않은 쾌적한 폰트 스케일 */
+        font-size: 0.90rem !important;
     }
 
-    /* 메인 캔버스 */
+    /* 메인 캔버스 톤 */
     .stApp {
-        background-color: #F8FAFC;
-        color: #1E293B;
+        background-color: #F8FAFC !important;
+        color: #1E293B !important;
     }
 
     /* ========================================================= */
@@ -58,7 +58,7 @@ st.markdown("""
         margin-left: -2rem;
         margin-right: -2rem;
         margin-top: -3.5rem;
-        margin-bottom: 24px;
+        margin-bottom: 20px;
         box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
         display: flex;
         align-items: center;
@@ -66,69 +66,74 @@ st.markdown("""
     }
 
     /* ========================================================= */
-    /* 2. 전 카테고리 통합 검색: 완벽한 단일 박스 컨테이너         */
+    /* 2. 전 카테고리 통합 검색: 완벽한 단일 폐쇄형 박스 컨테이너 */
     /* ========================================================= */
-    [data-testid="stVerticalBlockBorderWrapper"] {
+    div[data-testid="stVerticalBlock"]:has(> div #search_box_anchor) {
         background-color: #FFFFFF !important;
-        border: 1px solid #CBD5E1 !important;
-        border-left: 4px solid #1E3A8A !important;
+        border: 1.5px solid #CBD5E1 !important;
         border-radius: 8px !important;
-        padding: 16px 20px !important;
+        padding: 20px 24px !important;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
         margin-bottom: 24px !important;
     }
 
     /* ========================================================= */
-    /* 3. [Folder-Tab 일체화] 탭 버튼과 바디가 매끄럽게 연결되는 구조 */
+    /* 3. [미리보기 완벽 일치] BaseWeb 탭 오버라이드 (서류철형)    */
     /* ========================================================= */
-    div[data-testid="stTabs"] div[role="tablist"] {
+    /* 탭 기본 붉은색/파란색 밑줄 제거 */
+    div[data-baseweb="tab-highlight"] {
+        display: none !important;
+    }
+    div[data-baseweb="tab-list"] {
         gap: 6px !important;
-        border-bottom: 2px solid #CBD5E1 !important;
         background-color: transparent !important;
+        border-bottom: 2px solid #CBD5E1 !important;
         padding: 0 !important;
         margin-bottom: -2px !important;
     }
 
-    /* OFF 탭: 차분한 소프트 슬레이트 버튼 (뚜렷한 글씨) */
-    div[data-testid="stTabs"] button[role="tab"] {
+    /* OFF 탭 (비선택): 차분한 소프트 슬레이트 버튼 */
+    button[data-baseweb="tab"] {
         background-color: #E2E8F0 !important;
-        border: 1px solid #CBD5E1 !important;
+        border: 1.5px solid #CBD5E1 !important;
         border-bottom: 2px solid #CBD5E1 !important;
         border-radius: 8px 8px 0 0 !important;
-        padding: 8px 20px !important;
-        height: 42px !important;
-        transition: all 0.2s ease !important;
+        padding: 10px 22px !important;
+        height: 44px !important;
+        transition: all 0.15s ease !important;
     }
-    div[data-testid="stTabs"] button[role="tab"] p,
-    div[data-testid="stTabs"] button[role="tab"] div {
+    button[data-baseweb="tab"] p,
+    button[data-baseweb="tab"] span,
+    button[data-baseweb="tab"] div {
         color: #475569 !important;
         font-weight: 600 !important;
         font-size: 0.88rem !important;
     }
-    div[data-testid="stTabs"] button[role="tab"]:hover {
+    button[data-baseweb="tab"]:hover {
         background-color: #CBD5E1 !important;
     }
 
-    /* ON 탭: 바디와 100% 동일한 화이트 배경 + 하단선 뚫기로 일체화 */
-    div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] {
+    /* ON 탭 (선택): 바디와 완전히 동일한 화이트 + 하단선 뚫기로 일체화 */
+    button[data-baseweb="tab"][aria-selected="true"] {
         background-color: #FFFFFF !important;
-        border: 2px solid #1E3A8A !important;
-        border-bottom: 2px solid #FFFFFF !important; /* 바디와 틈새 없이 관통 */
+        border: 2px solid #CBD5E1 !important;
+        border-top: 3px solid #1E3A8A !important;
+        border-bottom: 3px solid #FFFFFF !important; /* 바디와 경계선 없이 관통 */
         border-radius: 8px 8px 0 0 !important;
-        margin-bottom: -2px !important;
         z-index: 10 !important;
     }
-    div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] p,
-    div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] div {
+    button[data-baseweb="tab"][aria-selected="true"] p,
+    button[data-baseweb="tab"][aria-selected="true"] span,
+    button[data-baseweb="tab"][aria-selected="true"] div {
         color: #1E3A8A !important;
         font-weight: 800 !important;
         font-size: 0.90rem !important;
     }
 
-    /* 탭 바디 영역: 탭과 일체화되는 화이트 패널 */
-    div[data-testid="stTabs"] div[role="tabpanel"] {
+    /* 탭 바디 영역: 탭과 100% 일체화되는 화이트 패널 */
+    div[data-baseweb="tab-panel"] {
         background-color: #FFFFFF !important;
-        border: 2px solid #1E3A8A !important;
+        border: 2px solid #CBD5E1 !important;
         border-radius: 0 8px 8px 8px !important;
         padding: 24px !important;
         box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04) !important;
@@ -136,15 +141,15 @@ st.markdown("""
     }
 
     /* ========================================================= */
-    /* 4. 지표(Metric) 카드                                      */
+    /* 4. 지표(Metric) 카드: 콤팩트 규격                          */
     /* ========================================================= */
     [data-testid="stMetric"] {
-        background-color: #F8FAFC;
-        padding: 14px 18px;
-        border-radius: 6px;
-        border: 1px solid #E2E8F0;
-        border-left: 3.5px solid #1E3A8A;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+        background-color: #F8FAFC !important;
+        padding: 14px 18px !important;
+        border-radius: 6px !important;
+        border: 1px solid #E2E8F0 !important;
+        border-left: 3.5px solid #1E3A8A !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02) !important;
     }
     [data-testid="stMetricLabel"] {
         font-size: 0.74rem !important;
@@ -780,7 +785,7 @@ st.sidebar.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# 로그아웃 버튼 (Primary 타입으로 흰색 글씨 강제 확보)
+# 로그아웃 버튼
 if st.sidebar.button("로그아웃", type="primary", use_container_width=True):
     log_activity(
         st.session_state["username"], 
@@ -1040,9 +1045,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =========================================================================
-# 7. [메인 화면] 2. 전 카테고리 통합 검색: 완벽한 단일 폐쇄형 카드 블록
+# 7. [메인 화면] 2. 전 카테고리 통합 검색: 완벽한 단일 박스 컨테이너
 # =========================================================================
-with st.container(border=True):
+with st.container():
+    st.markdown('<div id="search_box_anchor"></div>', unsafe_allow_html=True)
     st.markdown("""
     <h3 style="margin: 0 0 4px 0; font-size: 1.10rem; font-weight: 700; color: #0F172A;">🔍 전 카테고리 통합 실시간 검색</h3>
     <p style="margin: 0 0 12px 0; font-size: 0.82rem; color: #64748B;">키워드를 입력하면 모든 엑셀 데이터(주요 이슈, 경쟁 PT, 대행사 및 매체사 매출)에서 즉시 찾아냅니다.</p>
