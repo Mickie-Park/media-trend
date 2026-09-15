@@ -415,7 +415,7 @@ if auth_token and not st.session_state["logged_in"]:
         st.session_state["user_name"] = users_current[auth_token].get("name", auth_token)
         st.session_state["login_time"] = get_now_kst()
 
-# --- 3. [핵심] 원본 엑셀 실데이터 구조 기반 정확한 파싱 함수 ---
+# --- 3. [완벽 검증] 원본 엑셀 실데이터 구조 기반 정확한 파싱 함수 ---
 @st.cache_data
 def load_all_data():
     raw_files = glob.glob("**/*.[xX][lL][sS][xX]", recursive=True)
@@ -462,6 +462,12 @@ def load_all_data():
         "OCN": "OCN"
     }
 
+    def clean_str(val):
+        if pd.isna(val): return ""
+        v = str(val).strip()
+        if v.lower() in ["nan", "none", "-"]: return ""
+        return v
+
     for f in all_files:
         m = re.search(r'(\d{4})(\d{2})', f)
         ym = f"{m.group(1)}-{m.group(2)}" if m else "기타"
@@ -484,19 +490,13 @@ def load_all_data():
                 elif current_issue and text.startswith("-"):
                     issues_list.append({"연월": ym, "헤드라인": current_issue, "상세": text[1:].strip()})
             
-            # B. [원 데이터 기반 완벽 수정] 광고회사 PT 현황 파싱
-            def clean_str(val):
-                if pd.isna(val): return ""
-                v = str(val).strip()
-                if v.lower() in ["nan", "none", "-"]: return ""
-                return v
-
+            # B. [원 데이터 기반 공백 무관 완벽 파싱] 광고회사 PT 현황
             for p_idx in range(len(df)):
                 row_cells = [clean_str(x) for x in df.iloc[p_idx].tolist()]
-                row_text = "".join(row_cells)
+                row_text_no_space = "".join(row_cells).replace(" ", "")
                 
-                # 헤더 행 발견 시
-                if "PT일자" in row_text and "광고주" in row_text:
+                # 공백 무관하게 'PT일자'와 '광고주' 인식
+                if "PT일자" in row_text_no_space and "광고주" in row_text_no_space:
                     col_map = {
                         "date": 0, "client": 1, "product": 2, "billing": 3,
                         "participants": 4, "incumbent": 6, "winner": 7, "memo": 8
@@ -519,7 +519,8 @@ def load_all_data():
                         
                         if any(stop_kw in row_full_str for stop_kw in ["광고회사 전파광고", "대행사 전파광고", "지상파 매출", "종합/유선채널"]):
                             break
-                        if "PT일자" in row_full_str and "광고주" in row_full_str:
+                        sub_row_no_space = "".join([clean_str(x) for x in sub_row]).replace(" ", "")
+                        if "PT일자" in sub_row_no_space and "광고주" in sub_row_no_space:
                             break
                         
                         client_val = clean_str(sub_row[col_map["client"]]) if col_map["client"] < len(sub_row) else ""
@@ -570,8 +571,8 @@ def load_all_data():
                             "품목": product_val,
                             "빌링(억원)": billing_val,
                             "빌링_원문": billing_raw,
-                            "참여사": participants_val,
                             "기존사": incumbent_val,
+                            "참여사": participants_val,
                             "선정사(결과)": winner_val,
                             "메모(비고)": memo_val
                         })
@@ -1102,7 +1103,7 @@ with search_container:
         if len(matched_pt) > 0:
             with st.expander(f"PT 수주 현황 검색 결과 ({len(matched_pt)}건)", expanded=True):
                 st.dataframe(
-                    matched_pt[["발행연월", "PT일자", "광고주", "품목", "빌링_원문", "참여사", "기존사", "선정사(결과)", "메모(비고)"]].rename(columns={"빌링_원문": "빌링(억원)"}),
+                    matched_pt[["발행연월", "PT일자", "광고주", "품목", "빌링_원문", "기존사", "참여사", "선정사(결과)", "메모(비고)"]].rename(columns={"빌링_원문": "빌링(억원)"}),
                     hide_index=True,
                     use_container_width=True
                 )
@@ -1176,9 +1177,9 @@ with body_container:
             if winner_search:
                 view_pt = view_pt[view_pt["선정사(결과)"].str.contains(winner_search, na=False)]
 
-            # 원본 엑셀 컬럼 배열과 100% 일치: PT일자 -> 광고주 -> 품목 -> 빌링 -> 참여사 -> 기존사 -> 선정사(결과) -> 메모(비고)
+            # 원본 엑셀 컬럼 배열과 100% 일치: PT일자 -> 광고주 -> 품목 -> 빌링 -> 기존사 -> 참여사 -> 선정사(결과) -> 메모(비고)
             st.dataframe(
-                view_pt[["PT일자", "광고주", "품목", "빌링_원문", "참여사", "기존사", "선정사(결과)", "메모(비고)"]].rename(columns={"빌링_원문": "빌링(억원)"}),
+                view_pt[["PT일자", "광고주", "품목", "빌링_원문", "기존사", "참여사", "선정사(결과)", "메모(비고)"]].rename(columns={"빌링_원문": "빌링(억원)"}),
                 use_container_width=True,
                 hide_index=True
             )
