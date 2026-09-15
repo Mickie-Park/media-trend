@@ -24,10 +24,10 @@ GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", None)
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "Mickie-Park/media-trend")
 FILE_PATH = "users.json"
 
-# --- 2. Option C: 미리보기 100% 일치 서류철형 탭 + 검색 블록 완전 일체화 CSS ---
+# --- 2. Option C: 서류철형 세그먼트 탭 + 검색 블록 일체화 완벽 보장 CSS ---
 st.markdown("""
 <style>
-    /* 1. 표준 글로벌 금융/컨설팅 서체 */
+    /* 1. 글로벌 표준 Inter + Pretendard 타이포그래피 (쾌적한 가독성 규격) */
     @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
     @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
     
@@ -38,7 +38,7 @@ st.markdown("""
         font-size: 0.90rem !important;
     }
 
-    /* 메인 캔버스 톤 */
+    /* 메인 캔버스 */
     .stApp {
         background-color: #F8FAFC !important;
         color: #1E293B !important;
@@ -66,82 +66,61 @@ st.markdown("""
     }
 
     /* ========================================================= */
-    /* 2. 전 카테고리 통합 검색: 완벽한 단일 폐쇄형 박스 컨테이너 */
+    /* 2. [미리보기 완벽 일치] 카테고리 선택 버튼 (ON/OFF 세그먼트) */
     /* ========================================================= */
-    div[data-testid="stVerticalBlock"]:has(> div #search_box_anchor) {
-        background-color: #FFFFFF !important;
-        border: 1.5px solid #CBD5E1 !important;
-        border-radius: 8px !important;
-        padding: 20px 24px !important;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
-        margin-bottom: 24px !important;
-    }
-
-    /* ========================================================= */
-    /* 3. [미리보기 완벽 일치] BaseWeb 탭 오버라이드 (서류철형)    */
-    /* ========================================================= */
-    /* 탭 기본 붉은색/파란색 밑줄 제거 */
-    div[data-baseweb="tab-highlight"] {
-        display: none !important;
-    }
-    div[data-baseweb="tab-list"] {
+    div[data-testid="stRadio"] > div[role="radiogroup"] {
+        display: flex !important;
+        flex-direction: row !important;
         gap: 6px !important;
-        background-color: transparent !important;
-        border-bottom: 2px solid #CBD5E1 !important;
-        padding: 0 !important;
-        margin-bottom: -2px !important;
+        margin-bottom: -2px !important; /* 바디 컨테이너와 틈새 없이 접합 */
+        z-index: 5 !important;
     }
 
-    /* OFF 탭 (비선택): 차분한 소프트 슬레이트 버튼 */
-    button[data-baseweb="tab"] {
+    /* OFF 버튼: 차분한 소프트 슬레이트 */
+    div[data-testid="stRadio"] > div[role="radiogroup"] > label {
         background-color: #E2E8F0 !important;
         border: 1.5px solid #CBD5E1 !important;
         border-bottom: 2px solid #CBD5E1 !important;
         border-radius: 8px 8px 0 0 !important;
-        padding: 10px 22px !important;
-        height: 44px !important;
+        padding: 8px 20px !important;
+        margin: 0 !important;
+        cursor: pointer !important;
         transition: all 0.15s ease !important;
     }
-    button[data-baseweb="tab"] p,
-    button[data-baseweb="tab"] span,
-    button[data-baseweb="tab"] div {
+    div[data-testid="stRadio"] > div[role="radiogroup"] > label div,
+    div[data-testid="stRadio"] > div[role="radiogroup"] > label p {
         color: #475569 !important;
         font-weight: 600 !important;
         font-size: 0.88rem !important;
     }
-    button[data-baseweb="tab"]:hover {
+    div[data-testid="stRadio"] > div[role="radiogroup"] > label:hover {
         background-color: #CBD5E1 !important;
     }
 
-    /* ON 탭 (선택): 바디와 완전히 동일한 화이트 + 하단선 뚫기로 일체화 */
-    button[data-baseweb="tab"][aria-selected="true"] {
+    /* 라디오 원형 체크 아이콘 숨기기 */
+    div[data-testid="stRadio"] > div[role="radiogroup"] > label input[type="radio"],
+    div[data-testid="stRadio"] > div[role="radiogroup"] > label > div:first-child {
+        display: none !important;
+    }
+
+    /* ON 버튼: 바디와 동일한 화이트 + 하단선 관통 + 상단 네이비 포인트 */
+    div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input:checked) {
         background-color: #FFFFFF !important;
         border: 2px solid #CBD5E1 !important;
         border-top: 3px solid #1E3A8A !important;
-        border-bottom: 3px solid #FFFFFF !important; /* 바디와 경계선 없이 관통 */
+        border-bottom: 3px solid #FFFFFF !important; /* 아래 바디와 단절 없이 직결 */
         border-radius: 8px 8px 0 0 !important;
         z-index: 10 !important;
     }
-    button[data-baseweb="tab"][aria-selected="true"] p,
-    button[data-baseweb="tab"][aria-selected="true"] span,
-    button[data-baseweb="tab"][aria-selected="true"] div {
+    div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input:checked) div,
+    div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input:checked) p {
         color: #1E3A8A !important;
         font-weight: 800 !important;
         font-size: 0.90rem !important;
     }
 
-    /* 탭 바디 영역: 탭과 100% 일체화되는 화이트 패널 */
-    div[data-baseweb="tab-panel"] {
-        background-color: #FFFFFF !important;
-        border: 2px solid #CBD5E1 !important;
-        border-radius: 0 8px 8px 8px !important;
-        padding: 24px !important;
-        box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04) !important;
-        margin-top: 0 !important;
-    }
-
     /* ========================================================= */
-    /* 4. 지표(Metric) 카드: 콤팩트 규격                          */
+    /* 3. 지표(Metric) 카드: 콤팩트 규격                          */
     /* ========================================================= */
     [data-testid="stMetric"] {
         background-color: #F8FAFC !important;
@@ -166,7 +145,7 @@ st.markdown("""
     }
 
     /* ========================================================= */
-    /* 5. 사이드바 UI 버그 완전 해결 (버튼 및 업로더)             */
+    /* 4. 사이드바 UI 완벽 가독성 (로그아웃, 업로더)               */
     /* ========================================================= */
     [data-testid="stSidebar"] {
         background-color: #0C1A30 !important;
@@ -185,7 +164,6 @@ st.markdown("""
         font-size: 0.76rem !important;
     }
 
-    /* 사이드바 모든 버튼 강제 가독성 확보 */
     [data-testid="stSidebar"] button,
     [data-testid="stSidebar"] .stButton button,
     [data-testid="stSidebar"] [data-testid="baseButton-primary"],
@@ -1045,10 +1023,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =========================================================================
-# 7. [메인 화면] 2. 전 카테고리 통합 검색: 완벽한 단일 박스 컨테이너
+# 7. [메인 화면] 2. 전 카테고리 통합 검색: 완벽한 단일 폐쇄형 박스 컨테이너
 # =========================================================================
-with st.container():
-    st.markdown('<div id="search_box_anchor"></div>', unsafe_allow_html=True)
+search_container = st.container(border=True)
+with search_container:
     st.markdown("""
     <h3 style="margin: 0 0 4px 0; font-size: 1.10rem; font-weight: 700; color: #0F172A;">🔍 전 카테고리 통합 실시간 검색</h3>
     <p style="margin: 0 0 12px 0; font-size: 0.82rem; color: #64748B;">키워드를 입력하면 모든 엑셀 데이터(주요 이슈, 경쟁 PT, 대행사 및 매체사 매출)에서 즉시 찾아냅니다.</p>
@@ -1128,306 +1106,316 @@ with st.container():
             st.warning(f"'{global_query}'에 대한 검색 결과가 없습니다.")
 
 # =========================================================================
-# 7. [메인 화면] 3. 서류철형 일체화 탭 (Folder-Tab Architecture)
+# 7. [메인 화면] 3. 서류철형(Folder-Tab) 카테고리 선택 버튼 & 일체형 바디
 # =========================================================================
-tab1, tab2, tab3, tab4 = st.tabs([
+categories = [
     "광고회사 PT 수주 현황", 
     "대행사/매체사 매출 동향", 
     "월별 핵심 이슈 브리핑", 
     "AI 동향 분석가"
-])
+]
 
-# 탭 1: PT 수주 현황
-with tab1:
-    st.markdown("<h3 style='font-size: 1.20rem; font-weight: 700; color: #0F172A; margin-bottom: 2px;'>광고회사 경쟁 PT 모니터링 및 수주 분석</h3>", unsafe_allow_html=True)
-    st.caption("경쟁 PT 동향, 빌링 규모, 대행사별 수주 실적을 정밀 분석합니다.")
-    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-    
-    if not df_pt_unique.empty:
-        available_years = sorted(list(set([str(y) for y in df_pt_unique["연도"].dropna() if str(y).isdigit()])), reverse=True)
-        selected_pt_year = st.selectbox("PT 연도 선택", ["전체 연도"] + available_years)
+selected_category = st.radio(
+    "카테고리 선택", 
+    options=categories, 
+    horizontal=True, 
+    label_visibility="collapsed"
+)
 
-        view_pt = df_pt_unique.copy()
-        if selected_pt_year != "전체 연도":
-            view_pt = view_pt[view_pt["연도"] == selected_pt_year]
+# 선택된 버튼과 100% 동일한 화이트로 연결되는 일체형 바디 컨테이너
+body_container = st.container(border=True)
+with body_container:
+    # 탭 1: PT 수주 현황
+    if selected_category == "광고회사 PT 수주 현황":
+        st.markdown("<h3 style='font-size: 1.20rem; font-weight: 700; color: #0F172A; margin-bottom: 2px;'>광고회사 경쟁 PT 모니터링 및 수주 분석</h3>", unsafe_allow_html=True)
+        st.caption("경쟁 PT 동향, 빌링 규모, 대행사별 수주 실적을 정밀 분석합니다.")
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+        
+        if not df_pt_unique.empty:
+            available_years = sorted(list(set([str(y) for y in df_pt_unique["연도"].dropna() if str(y).isdigit()])), reverse=True)
+            selected_pt_year = st.selectbox("PT 연도 선택", ["전체 연도"] + available_years)
 
-        m1, m2, m3 = st.columns(3)
-        m1.metric(f"PT 모니터링 건수 ({selected_pt_year})", f"{len(view_pt)}건")
-        m2.metric("집계된 빌링 규모", f"{int(view_pt['빌링(억원)'].sum()):,}억원")
-        avg_b = view_pt[view_pt['빌링(억원)'] > 0]['빌링(억원)'].mean()
-        m3.metric("평균 프로젝트 빌링", f"{avg_b:.1f}억원" if pd.notna(avg_b) else "집계중")
+            view_pt = df_pt_unique.copy()
+            if selected_pt_year != "전체 연도":
+                view_pt = view_pt[view_pt["연도"] == selected_pt_year]
 
-        st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
-        f_col1, f_col2, f_col3 = st.columns([2, 2, 2])
-        with f_col1:
-            search_query = st.text_input("광고주 또는 품목 검색", placeholder="예: 라이나, 카카오, 샴푸")
-        with f_col2:
-            max_b_val = int(df_pt_unique['빌링(억원)'].max()) if df_pt_unique['빌링(억원)'].max() > 0 else 100
-            min_b = st.slider("최소 빌링 (억원)", 0, max_b_val, 0)
-        with f_col3:
-            winner_search = st.text_input("선정사(승자) 검색", placeholder="예: 제일, 이노션, 차이")
+            m1, m2, m3 = st.columns(3)
+            m1.metric(f"PT 모니터링 건수 ({selected_pt_year})", f"{len(view_pt)}건")
+            m2.metric("집계된 빌링 규모", f"{int(view_pt['빌링(억원)'].sum()):,}억원")
+            avg_b = view_pt[view_pt['빌링(억원)'] > 0]['빌링(억원)'].mean()
+            m3.metric("평균 프로젝트 빌링", f"{avg_b:.1f}억원" if pd.notna(avg_b) else "집계중")
 
-        if search_query:
-            view_pt = view_pt[view_pt["광고주"].str.contains(search_query, na=False) | view_pt["품목"].str.contains(search_query, na=False)]
-        if min_b > 0:
-            view_pt = view_pt[view_pt["빌링(억원)"] >= min_b]
-        if winner_search:
-            view_pt = view_pt[view_pt["선정사"].str.contains(winner_search, na=False)]
+            st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
+            f_col1, f_col2, f_col3 = st.columns([2, 2, 2])
+            with f_col1:
+                search_query = st.text_input("광고주 또는 품목 검색", placeholder="예: 라이나, 카카오, 샴푸")
+            with f_col2:
+                max_b_val = int(df_pt_unique['빌링(억원)'].max()) if df_pt_unique['빌링(억원)'].max() > 0 else 100
+                min_b = st.slider("최소 빌링 (억원)", 0, max_b_val, 0)
+            with f_col3:
+                winner_search = st.text_input("선정사(승자) 검색", placeholder="예: 제일, 이노션, 차이")
 
-        st.dataframe(
-            view_pt[["PT일자", "광고주", "품목", "빌링_원문", "참여사", "기존사", "선정사", "메모"]].rename(columns={"빌링_원문": "빌링(억원)"}),
-            use_container_width=True,
-            hide_index=True
+            if search_query:
+                view_pt = view_pt[view_pt["광고주"].str.contains(search_query, na=False) | view_pt["품목"].str.contains(search_query, na=False)]
+            if min_b > 0:
+                view_pt = view_pt[view_pt["빌링(억원)"] >= min_b]
+            if winner_search:
+                view_pt = view_pt[view_pt["선정사"].str.contains(winner_search, na=False)]
+
+            st.dataframe(
+                view_pt[["PT일자", "광고주", "품목", "빌링_원문", "참여사", "기존사", "선정사", "메모"]].rename(columns={"빌링_원문": "빌링(억원)"}),
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.info("PT 데이터가 없습니다.")
+
+    # 탭 2: 매출 동향
+    elif selected_category == "대행사/매체사 매출 동향":
+        st.markdown("<h3 style='font-size: 1.20rem; font-weight: 700; color: #0F172A; margin-bottom: 2px;'>광고대행사 및 방송 매체사 매출 추이 & YoY 분석</h3>", unsafe_allow_html=True)
+        st.caption("대행사별 전파광고 매출 및 방송사(지상파/종편/유선) 광고 실적 통계입니다.")
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+        
+        view_mode = st.radio(
+            "보기 방식",
+            ["그래프 보기", "상세 매출표 보기", "둘 다 보기"],
+            horizontal=True
         )
-    else:
-        st.info("PT 데이터가 없습니다.")
+        st.markdown("---")
+        
+        col_l, col_r = st.columns(2)
+        
+        # [좌측] 대행사 영역
+        with col_l:
+            st.markdown("##### 주요 광고대행사 전파광고 매출")
+            if not df_agency.empty:
+                all_agencies = sorted(df_agency["대행사"].unique().tolist())
+                agency_years = sorted(list(set([str(y) for y in df_agency["연도"].dropna() if str(y).isdigit()])), reverse=True)
+                
+                c_ag1, c_ag2 = st.columns([1.2, 1])
+                with c_ag1:
+                    selected_single_agency = st.selectbox("대행사 선택", all_agencies, key="sel_single_agency")
+                with c_ag2:
+                    selected_ag_year = st.selectbox("조회 연도", ["전체 연도"] + agency_years, key="sel_ag_year")
 
-# 탭 2: 매출 동향
-with tab2:
-    st.markdown("<h3 style='font-size: 1.20rem; font-weight: 700; color: #0F172A; margin-bottom: 2px;'>광고대행사 및 방송 매체사 매출 추이 & YoY 분석</h3>", unsafe_allow_html=True)
-    st.caption("대행사별 전파광고 매출 및 방송사(지상파/종편/유선) 광고 실적 통계입니다.")
-    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-    
-    view_mode = st.radio(
-        "보기 방식",
-        ["그래프 보기", "상세 매출표 보기", "둘 다 보기"],
-        horizontal=True
-    )
-    st.markdown("---")
-    
-    col_l, col_r = st.columns(2)
-    
-    # [좌측] 대행사 영역
-    with col_l:
-        st.markdown("##### 주요 광고대행사 전파광고 매출")
-        if not df_agency.empty:
-            all_agencies = sorted(df_agency["대행사"].unique().tolist())
-            agency_years = sorted(list(set([str(y) for y in df_agency["연도"].dropna() if str(y).isdigit()])), reverse=True)
-            
-            c_ag1, c_ag2 = st.columns([1.2, 1])
-            with c_ag1:
-                selected_single_agency = st.selectbox("대행사 선택", all_agencies, key="sel_single_agency")
-            with c_ag2:
-                selected_ag_year = st.selectbox("조회 연도", ["전체 연도"] + agency_years, key="sel_ag_year")
-
-            df_single_ag = df_agency[df_agency["대행사"] == selected_single_agency]
-            
-            if selected_ag_year != "전체 연도":
-                df_view_ag = df_single_ag[df_single_ag["연도"] == selected_ag_year]
-            else:
-                df_view_ag = df_single_ag
-
-            if view_mode in ["그래프 보기", "둘 다 보기"]:
-                fig_ag = px.bar(
-                    df_view_ag, 
-                    x="연월", 
-                    y="매출(억원)", 
-                    text_auto=True,
-                    title=f"[{selected_single_agency}] 매출 추이 ({selected_ag_year})",
-                    color_discrete_sequence=["#1E3A8A"]
-                )
-                fig_ag.update_layout(
-                    plot_bgcolor="#FFFFFF",
-                    paper_bgcolor="#FFFFFF",
-                    font_family="Inter, Pretendard",
-                    font_size=12,
-                    margin=dict(t=35, l=10, r=10, b=10)
-                )
-                st.plotly_chart(fig_ag, use_container_width=True)
-
-            if view_mode in ["상세 매출표 보기", "둘 다 보기"]:
-                pivot_ag = df_view_ag.pivot_table(
-                    index="대행사", 
-                    columns="연월", 
-                    values="매출(억원)", 
-                    aggfunc="sum",
-                    fill_value=0
-                )
-                st.dataframe(pivot_ag, use_container_width=True)
-
-            with st.expander(f"{selected_single_agency} YoY 비교 분석", expanded=False):
-                if len(agency_years) >= 2:
-                    yoy_base_year = st.selectbox("기준 연도(당해)", agency_years, index=0, key="yoy_ag_base")
-                    prev_year = str(int(yoy_base_year) - 1)
-                    
-                    df_curr = df_single_ag[df_single_ag["연도"] == yoy_base_year][["월", "매출(억원)"]].rename(columns={"매출(억원)": f"{yoy_base_year}년"})
-                    df_prev = df_single_ag[df_single_ag["연도"] == prev_year][["월", "매출(억원)"]].rename(columns={"매출(억원)": f"{prev_year}년"})
-                    
-                    if not df_curr.empty and not df_prev.empty:
-                        df_yoy_ag = pd.merge(df_prev, df_curr, on="월", how="outer").fillna(0)
-                        
-                        def month_sort_key(m):
-                            digits = re.findall(r'\d+', str(m))
-                            return int(digits[0]) if digits else 99
-                        df_yoy_ag["월순서"] = df_yoy_ag["월"].apply(month_sort_key)
-                        df_yoy_ag = df_yoy_ag.sort_values(by="월순서").drop(columns=["월순서"])
-                        
-                        df_yoy_ag["증감액(억원)"] = df_yoy_ag[f"{yoy_base_year}년"] - df_yoy_ag[f"{prev_year}년"]
-                        df_yoy_ag["YoY 증감률(%)"] = df_yoy_ag.apply(
-                            lambda r: f"{((r[f'{yoy_base_year}년'] - r[f'{prev_year}년']) / r[f'{prev_year}년'] * 100):+.1f}%" 
-                            if r[f"{prev_year}년"] > 0 else "-", axis=1
-                        )
-                        
-                        fig_yoy_ag = px.bar(
-                            df_yoy_ag, 
-                            x="월", 
-                            y=[f"{prev_year}년", f"{yoy_base_year}년"], 
-                            barmode="group",
-                            color_discrete_sequence=["#94A3B8", "#1E3A8A"],
-                            title=f"{prev_year}년 vs {yoy_base_year}년 월별 매출 비교"
-                        )
-                        fig_yoy_ag.update_layout(
-                            plot_bgcolor="#FFFFFF",
-                            paper_bgcolor="#FFFFFF",
-                            font_family="Inter, Pretendard",
-                            font_size=12,
-                            margin=dict(t=35, l=10, r=10, b=10)
-                        )
-                        st.plotly_chart(fig_yoy_ag, use_container_width=True)
-                        st.dataframe(df_yoy_ag, hide_index=True, use_container_width=True)
-                    else:
-                        st.info(f"{prev_year}년 또는 {yoy_base_year}년 데이터가 부족합니다.")
+                df_single_ag = df_agency[df_agency["대행사"] == selected_single_agency]
+                
+                if selected_ag_year != "전체 연도":
+                    df_view_ag = df_single_ag[df_single_ag["연도"] == selected_ag_year]
                 else:
-                    st.caption("축적된 연도 데이터가 2개 이상일 때 YoY 분석이 가능합니다.")
-        else:
-            st.info("대행사 매출 집계 중")
+                    df_view_ag = df_single_ag
 
-    # [우측] 방송 매체사 영역
-    with col_r:
-        st.markdown("##### 방송 매체사 광고 매출")
-        if not df_tv.empty:
-            tv_source = df_tv[df_tv["채널"] != "Total (광고매출 only)"]
-            all_channels = sorted(tv_source["채널"].unique().tolist())
-            tv_years = sorted(list(set([str(y) for y in tv_source["연도"].dropna() if str(y).isdigit()])), reverse=True)
-            
-            c_tv1, c_tv2 = st.columns([1.2, 1])
-            with c_tv1:
-                selected_single_tv = st.selectbox("방송 채널 선택", all_channels, key="sel_single_tv")
-            with c_tv2:
-                selected_tv_year = st.selectbox("조회 연도", ["전체 연도"] + tv_years, key="sel_tv_year")
+                if view_mode in ["그래프 보기", "둘 다 보기"]:
+                    fig_ag = px.bar(
+                        df_view_ag, 
+                        x="연월", 
+                        y="매출(억원)", 
+                        text_auto=True,
+                        title=f"[{selected_single_agency}] 매출 추이 ({selected_ag_year})",
+                        color_discrete_sequence=["#1E3A8A"]
+                    )
+                    fig_ag.update_layout(
+                        plot_bgcolor="#FFFFFF",
+                        paper_bgcolor="#FFFFFF",
+                        font_family="Inter, Pretendard",
+                        font_size=12,
+                        margin=dict(t=35, l=10, r=10, b=10)
+                    )
+                    st.plotly_chart(fig_ag, use_container_width=True)
 
-            df_single_tv = tv_source[tv_source["채널"] == selected_single_tv]
-            
-            if selected_tv_year != "전체 연도":
-                df_view_tv = df_single_tv[df_single_tv["연도"] == selected_tv_year]
-            else:
-                df_view_tv = df_single_tv
+                if view_mode in ["상세 매출표 보기", "둘 다 보기"]:
+                    pivot_ag = df_view_ag.pivot_table(
+                        index="대행사", 
+                        columns="연월", 
+                        values="매출(억원)", 
+                        aggfunc="sum",
+                        fill_value=0
+                    )
+                    st.dataframe(pivot_ag, use_container_width=True)
 
-            if view_mode in ["그래프 보기", "둘 다 보기"]:
-                fig_tv = px.line(
-                    df_view_tv, 
-                    x="연월", 
-                    y="매출(억원)", 
-                    markers=True,
-                    title=f"[{selected_single_tv}] 매출 추이 ({selected_tv_year})",
-                    color_discrete_sequence=["#1E3A8A"]
-                )
-                fig_tv.update_layout(
-                    plot_bgcolor="#FFFFFF",
-                    paper_bgcolor="#FFFFFF",
-                    font_family="Inter, Pretendard",
-                    font_size=12,
-                    margin=dict(t=35, l=10, r=10, b=10)
-                )
-                st.plotly_chart(fig_tv, use_container_width=True)
-
-            if view_mode in ["상세 매출표 보기", "둘 다 보기"]:
-                pivot_tv = df_view_tv.pivot_table(
-                    index="채널", 
-                    columns="연월", 
-                    values="매출(억원)", 
-                    aggfunc="sum",
-                    fill_value=0
-                )
-                st.dataframe(pivot_tv, use_container_width=True)
-
-            with st.expander(f"{selected_single_tv} YoY 비교 분석", expanded=False):
-                if len(tv_years) >= 2:
-                    yoy_tv_base = st.selectbox("기준 연도(당해)", tv_years, index=0, key="yoy_tv_base")
-                    prev_tv_year = str(int(yoy_tv_base) - 1)
-                    
-                    df_curr_tv = df_single_tv[df_single_tv["연도"] == yoy_tv_base][["월", "매출(억원)"]].rename(columns={"매출(억원)": f"{yoy_tv_base}년"})
-                    df_prev_tv = df_single_tv[df_single_tv["연도"] == prev_tv_year][["월", "매출(억원)"]].rename(columns={"매출(억원)": f"{prev_tv_year}년"})
-                    
-                    if not df_curr_tv.empty and not df_prev_tv.empty:
-                        df_yoy_tv = pd.merge(df_prev_tv, df_curr_tv, on="월", how="outer").fillna(0)
+                with st.expander(f"{selected_single_agency} YoY 비교 분석", expanded=False):
+                    if len(agency_years) >= 2:
+                        yoy_base_year = st.selectbox("기준 연도(당해)", agency_years, index=0, key="yoy_ag_base")
+                        prev_year = str(int(yoy_base_year) - 1)
                         
-                        def month_sort_key(m):
-                            digits = re.findall(r'\d+', str(m))
-                            return int(digits[0]) if digits else 99
-                        df_yoy_tv["월순서"] = df_yoy_tv["월"].apply(month_sort_key)
-                        df_yoy_tv = df_yoy_tv.sort_values(by="월순서").drop(columns=["월순서"])
+                        df_curr = df_single_ag[df_single_ag["연도"] == yoy_base_year][["월", "매출(억원)"]].rename(columns={"매출(억원)": f"{yoy_base_year}년"})
+                        df_prev = df_single_ag[df_single_ag["연도"] == prev_year][["월", "매출(억원)"]].rename(columns={"매출(억원)": f"{prev_year}년"})
                         
-                        df_yoy_tv["증감액(억원)"] = df_yoy_tv[f"{yoy_tv_base}년"] - df_yoy_tv[f"{prev_tv_year}년"]
-                        df_yoy_tv["YoY 증감률(%)"] = df_yoy_tv.apply(
-                            lambda r: f"{((r[f'{yoy_tv_base}년'] - r[f'{prev_tv_year}년']) / r[f'{prev_tv_year}년'] * 100):+.1f}%" 
-                            if r[f"{prev_tv_year}년"] > 0 else "-", axis=1
-                        )
-                        
-                        fig_yoy_tv = px.bar(
-                            df_yoy_tv, 
-                            x="월", 
-                            y=[f"{prev_tv_year}년", f"{yoy_tv_base}년"], 
-                            barmode="group",
-                            color_discrete_sequence=["#94A3B8", "#1E3A8A"],
-                            title=f"{prev_tv_year}년 vs {yoy_tv_base}년 월별 매출 비교"
-                        )
-                        fig_yoy_tv.update_layout(
-                            plot_bgcolor="#FFFFFF",
-                            paper_bgcolor="#FFFFFF",
-                            font_family="Inter, Pretendard",
-                            font_size=12,
-                            margin=dict(t=35, l=10, r=10, b=10)
-                        )
-                        st.plotly_chart(fig_yoy_tv, use_container_width=True)
-                        st.dataframe(df_yoy_tv, hide_index=True, use_container_width=True)
+                        if not df_curr.empty and not df_prev.empty:
+                            df_yoy_ag = pd.merge(df_prev, df_curr, on="월", how="outer").fillna(0)
+                            
+                            def month_sort_key(m):
+                                digits = re.findall(r'\d+', str(m))
+                                return int(digits[0]) if digits else 99
+                            df_yoy_ag["월순서"] = df_yoy_ag["월"].apply(month_sort_key)
+                            df_yoy_ag = df_yoy_ag.sort_values(by="월순서").drop(columns=["월순서"])
+                            
+                            df_yoy_ag["증감액(억원)"] = df_yoy_ag[f"{yoy_base_year}년"] - df_yoy_ag[f"{prev_year}년"]
+                            df_yoy_ag["YoY 증감률(%)"] = df_yoy_ag.apply(
+                                lambda r: f"{((r[f'{yoy_base_year}년'] - r[f'{prev_year}년']) / r[f'{prev_year}년'] * 100):+.1f}%" 
+                                if r[f"{prev_year}년"] > 0 else "-", axis=1
+                            )
+                            
+                            fig_yoy_ag = px.bar(
+                                df_yoy_ag, 
+                                x="월", 
+                                y=[f"{prev_year}년", f"{yoy_base_year}년"], 
+                                barmode="group",
+                                color_discrete_sequence=["#94A3B8", "#1E3A8A"],
+                                title=f"{prev_year}년 vs {yoy_base_year}년 월별 매출 비교"
+                            )
+                            fig_yoy_ag.update_layout(
+                                plot_bgcolor="#FFFFFF",
+                                paper_bgcolor="#FFFFFF",
+                                font_family="Inter, Pretendard",
+                                font_size=12,
+                                margin=dict(t=35, l=10, r=10, b=10)
+                            )
+                            st.plotly_chart(fig_yoy_ag, use_container_width=True)
+                            st.dataframe(df_yoy_ag, hide_index=True, use_container_width=True)
+                        else:
+                            st.info(f"{prev_year}년 또는 {yoy_base_year}년 데이터가 부족합니다.")
                     else:
-                        st.info(f"{prev_tv_year}년 또는 {yoy_tv_base}년 데이터가 부족합니다.")
+                        st.caption("축적된 연도 데이터가 2개 이상일 때 YoY 분석이 가능합니다.")
+            else:
+                st.info("대행사 매출 집계 중")
+
+        # [우측] 방송 매체사 영역
+        with col_r:
+            st.markdown("##### 방송 매체사 광고 매출")
+            if not df_tv.empty:
+                tv_source = df_tv[df_tv["채널"] != "Total (광고매출 only)"]
+                all_channels = sorted(tv_source["채널"].unique().tolist())
+                tv_years = sorted(list(set([str(y) for y in tv_source["연도"].dropna() if str(y).isdigit()])), reverse=True)
+                
+                c_tv1, c_tv2 = st.columns([1.2, 1])
+                with c_tv1:
+                    selected_single_tv = st.selectbox("방송 채널 선택", all_channels, key="sel_single_tv")
+                with c_tv2:
+                    selected_tv_year = st.selectbox("조회 연도", ["전체 연도"] + tv_years, key="sel_tv_year")
+
+                df_single_tv = tv_source[tv_source["채널"] == selected_single_tv]
+                
+                if selected_tv_year != "전체 연도":
+                    df_view_tv = df_single_tv[df_single_tv["연도"] == selected_tv_year]
                 else:
-                    st.caption("축적된 연도 데이터가 2개 이상일 때 YoY 분석이 가능합니다.")
+                    df_view_tv = df_single_tv
+
+                if view_mode in ["그래프 보기", "둘 다 보기"]:
+                    fig_tv = px.line(
+                        df_view_tv, 
+                        x="연월", 
+                        y="매출(억원)", 
+                        markers=True,
+                        title=f"[{selected_single_tv}] 매출 추이 ({selected_tv_year})",
+                        color_discrete_sequence=["#1E3A8A"]
+                    )
+                    fig_tv.update_layout(
+                        plot_bgcolor="#FFFFFF",
+                        paper_bgcolor="#FFFFFF",
+                        font_family="Inter, Pretendard",
+                        font_size=12,
+                        margin=dict(t=35, l=10, r=10, b=10)
+                    )
+                    st.plotly_chart(fig_tv, use_container_width=True)
+
+                if view_mode in ["상세 매출표 보기", "둘 다 보기"]:
+                    pivot_tv = df_view_tv.pivot_table(
+                        index="채널", 
+                        columns="연월", 
+                        values="매출(억원)", 
+                        aggfunc="sum",
+                        fill_value=0
+                    )
+                    st.dataframe(pivot_tv, use_container_width=True)
+
+                with st.expander(f"{selected_single_tv} YoY 비교 분석", expanded=False):
+                    if len(tv_years) >= 2:
+                        yoy_tv_base = st.selectbox("기준 연도(당해)", tv_years, index=0, key="yoy_tv_base")
+                        prev_tv_year = str(int(yoy_tv_base) - 1)
+                        
+                        df_curr_tv = df_single_tv[df_single_tv["연도"] == yoy_tv_base][["월", "매출(억원)"]].rename(columns={"매출(억원)": f"{yoy_tv_base}년"})
+                        df_prev_tv = df_single_tv[df_single_tv["연도"] == prev_tv_year][["월", "매출(억원)"]].rename(columns={"매출(억원)": f"{prev_tv_year}년"})
+                        
+                        if not df_curr_tv.empty and not df_prev_tv.empty:
+                            df_yoy_tv = pd.merge(df_prev_tv, df_curr_tv, on="월", how="outer").fillna(0)
+                            
+                            def month_sort_key(m):
+                                digits = re.findall(r'\d+', str(m))
+                                return int(digits[0]) if digits else 99
+                            df_yoy_tv["월순서"] = df_yoy_tv["월"].apply(month_sort_key)
+                            df_yoy_tv = df_yoy_tv.sort_values(by="월순서").drop(columns=["월순서"])
+                            
+                            df_yoy_tv["증감액(억원)"] = df_yoy_tv[f"{yoy_tv_base}년"] - df_yoy_tv[f"{prev_tv_year}년"]
+                            df_yoy_tv["YoY 증감률(%)"] = df_yoy_tv.apply(
+                                lambda r: f"{((r[f'{yoy_tv_base}년'] - r[f'{prev_tv_year}년']) / r[f'{prev_tv_year}년'] * 100):+.1f}%" 
+                                if r[f"{prev_tv_year}년"] > 0 else "-", axis=1
+                            )
+                            
+                            fig_yoy_tv = px.bar(
+                                df_yoy_tv, 
+                                x="월", 
+                                y=[f"{prev_tv_year}년", f"{yoy_tv_base}년"], 
+                                barmode="group",
+                                color_discrete_sequence=["#94A3B8", "#1E3A8A"],
+                                title=f"{prev_tv_year}년 vs {yoy_tv_base}년 월별 매출 비교"
+                            )
+                            fig_yoy_tv.update_layout(
+                                plot_bgcolor="#FFFFFF",
+                                paper_bgcolor="#FFFFFF",
+                                font_family="Inter, Pretendard",
+                                font_size=12,
+                                margin=dict(t=35, l=10, r=10, b=10)
+                            )
+                            st.plotly_chart(fig_yoy_tv, use_container_width=True)
+                            st.dataframe(df_yoy_tv, hide_index=True, use_container_width=True)
+                        else:
+                            st.info(f"{prev_tv_year}년 또는 {yoy_tv_base}년 데이터가 부족합니다.")
+                    else:
+                        st.caption("축적된 연도 데이터가 2개 이상일 때 YoY 분석이 가능합니다.")
+            else:
+                st.info("방송사 매출 집계 중")
+
+    # 탭 3: 이슈 브리핑
+    elif selected_category == "월별 핵심 이슈 브리핑":
+        st.markdown("<h3 style='font-size: 1.20rem; font-weight: 700; color: #0F172A; margin-bottom: 2px;'>월별 업계 주요 이슈 및 정책 동향</h3>", unsafe_allow_html=True)
+        st.caption("방송통신 및 광고 업계의 월별 핵심 뉴스 및 정책 이슈를 모니터링합니다.")
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+        
+        if not df_issues.empty:
+            selected_ym = st.selectbox("조회 연월", options=sorted(df_issues["연월"].unique(), reverse=True))
+            ym_issues = df_issues[df_issues["연월"] == selected_ym]
+            for hl in ym_issues["헤드라인"].unique():
+                with st.expander(f"{hl}", expanded=True):
+                    details = ym_issues[(ym_issues["헤드라인"] == hl) & (ym_issues["상세"] != "")]["상세"].tolist()
+                    for d in details:
+                        st.write(f"• {d}")
         else:
-            st.info("방송사 매출 집계 중")
+            st.info("이슈 데이터가 없습니다.")
 
-# 탭 3: 이슈 브리핑
-with tab3:
-    st.markdown("<h3 style='font-size: 1.20rem; font-weight: 700; color: #0F172A; margin-bottom: 2px;'>월별 업계 주요 이슈 및 정책 동향</h3>", unsafe_allow_html=True)
-    st.caption("방송통신 및 광고 업계의 월별 핵심 뉴스 및 정책 이슈를 모니터링합니다.")
-    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-    
-    if not df_issues.empty:
-        selected_ym = st.selectbox("조회 연월", options=sorted(df_issues["연월"].unique(), reverse=True))
-        ym_issues = df_issues[df_issues["연월"] == selected_ym]
-        for hl in ym_issues["헤드라인"].unique():
-            with st.expander(f"{hl}", expanded=True):
-                details = ym_issues[(ym_issues["헤드라인"] == hl) & (ym_issues["상세"] != "")]["상세"].tolist()
-                for d in details:
-                    st.write(f"• {d}")
-    else:
-        st.info("이슈 데이터가 없습니다.")
-
-# 탭 4: AI 동향 분석가
-with tab4:
-    st.markdown("<h3 style='font-size: 1.20rem; font-weight: 700; color: #0F172A; margin-bottom: 2px;'>AI 기반 인텔리전스 분석 어시스턴트</h3>", unsafe_allow_html=True)
-    st.caption("적재된 빅데이터를 바탕으로 구글 Gemini 모델이 질문에 실시간 답변합니다.")
-    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-    
-    if not api_key:
-        st.warning("사이드바에 'Gemini API Key'를 설정하시면 실시간 AI 질의응답이 활성화됩니다.")
-    else:
-        try:
-            genai.configure(api_key=api_key)
-            target_model = "gemini-3.6-flash"
-            model = genai.GenerativeModel(target_model)
-            st.caption(f"연결 모델: `{target_model}`")
-            
-            user_question = st.text_input("질문을 입력하세요", placeholder="예: 최근 주요 광고주 PT 동향을 요약해줘")
-            
-            if st.button("AI 분석 요청", type="primary") and user_question:
-                with st.spinner("동향 데이터를 기반으로 분석을 생성 중입니다..."):
-                    context_issues = df_issues.head(40).to_string(index=False)
-                    context_pt = df_pt_unique.head(30).to_string(index=False)
-                    
-                    prompt = f"""
+    # 탭 4: AI 동향 분석가
+    elif selected_category == "AI 동향 분석가":
+        st.markdown("<h3 style='font-size: 1.20rem; font-weight: 700; color: #0F172A; margin-bottom: 2px;'>AI 기반 인텔리전스 분석 어시스턴트</h3>", unsafe_allow_html=True)
+        st.caption("적재된 빅데이터를 바탕으로 구글 Gemini 모델이 질문에 실시간 답변합니다.")
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+        
+        if not api_key:
+            st.warning("사이드바에 'Gemini API Key'를 설정하시면 실시간 AI 질의응답이 활성화됩니다.")
+        else:
+            try:
+                genai.configure(api_key=api_key)
+                target_model = "gemini-3.6-flash"
+                model = genai.GenerativeModel(target_model)
+                st.caption(f"연결 모델: `{target_model}`")
+                
+                user_question = st.text_input("질문을 입력하세요", placeholder="예: 최근 주요 광고주 PT 동향을 요약해줘")
+                
+                if st.button("AI 분석 요청", type="primary") and user_question:
+                    with st.spinner("동향 데이터를 기반으로 분석을 생성 중입니다..."):
+                        context_issues = df_issues.head(40).to_string(index=False)
+                        context_pt = df_pt_unique.head(30).to_string(index=False)
+                        
+                        prompt = f"""
 당신은 대한민국 미디어·방송·광고 업계 전문 분석가입니다.
 아래 제공된 [월별 업계 이슈 데이터]와 [광고회사 PT 현황 데이터]를 기반으로 질문에 명확하고 간결하게 답변해 주세요.
 
@@ -1445,20 +1433,20 @@ with tab4:
 2. 가독성을 위해 불릿 포인트로 정리하세요.
 3. 데이터에 없는 내용은 추측하지 마세요.
 """
-                    response = model.generate_content(prompt)
-                    
-                    log_activity(
-                        st.session_state["username"], 
-                        st.session_state["user_name"], 
-                        "AI 질의", 
-                        f"질문: {user_question[:40]}..."
-                    )
-                    
-                    st.markdown("##### 인텔리전스 분석 리포트")
-                    st.markdown(response.text)
-        except Exception as e:
-            err_msg = str(e)
-            if "429" in err_msg:
-                st.error("일시적으로 API 호출 한도에 도달했습니다. 잠시 후 다시 시도해 주세요.")
-            else:
-                st.error(f"AI 호출 오류: {err_msg}")
+                        response = model.generate_content(prompt)
+                        
+                        log_activity(
+                            st.session_state["username"], 
+                            st.session_state["user_name"], 
+                            "AI 질의", 
+                            f"질문: {user_question[:40]}..."
+                        )
+                        
+                        st.markdown("##### 인텔리전스 분석 리포트")
+                        st.markdown(response.text)
+            except Exception as e:
+                err_msg = str(e)
+                if "429" in err_msg:
+                    st.error("일시적으로 API 호출 한도에 도달했습니다. 잠시 후 다시 시도해 주세요.")
+                else:
+                    st.error(f"AI 호출 오류: {err_msg}")
