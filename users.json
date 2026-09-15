@@ -16,5 +16,11 @@
         "password": "cec961e99445fdc5bdba092be8f331101b898e494840dadfa9f2b79ed31996a7",
         "role": "member",
         "approved": true
+    },
+    "shkim": {
+        "name": "김석환",
+        "password": "39da2bbb3ce9997b2d82e7fb2412da366d2512c83711a450a87d8b0eb1cc9e37",
+        "role": "member",
+        "approved": false
     }
 }
