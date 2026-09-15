@@ -21,6 +21,6 @@
         "name": "김석환",
         "password": "39da2bbb3ce9997b2d82e7fb2412da366d2512c83711a450a87d8b0eb1cc9e37",
         "role": "member",
-        "approved": false
+        "approved": true
     }
 }
