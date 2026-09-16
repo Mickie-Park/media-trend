@@ -24,7 +24,7 @@ GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", None)
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "Mickie-Park/media-trend")
 FILE_PATH = "users.json"
 
-# --- 2. Option C: 서류철형 세그먼트 탭 + 검색 블록 일체화 CSS ---
+# --- 2. 옵션 3 테마 (웜 라이트 펄 #EAE8E3) & 직전 라디오 체크마크 복원 CSS ---
 st.markdown("""
 <style>
     /* 1. 글로벌 표준 Inter + Pretendard 타이포그래피 */
@@ -38,66 +38,54 @@ st.markdown("""
         font-size: 0.90rem !important;
     }
 
+    /* 옵션 3: 웜 라이트 펄 (#EAE8E3) 전체 캔버스 배경 */
     .stApp {
-        background-color: #F8FAFC !important;
+        background-color: #EAE8E3 !important;
         color: #1E293B !important;
     }
 
-    /* 1. 메인 본문 최상단 여백 최적화 (헤더가 좌측 사이드바로 이동함에 따른 최적 핏) */
+    /* 메인 본문 최상단 여백 최적화 */
     .block-container {
         padding-top: 1.8rem !important;
         padding-bottom: 3rem !important;
     }
 
-    /* 2. 카테고리 선택 버튼 (ON/OFF 세그먼트) */
+    /* 2. 카테고리 선택 버튼 (라디오 원형 체크마크 및 가로 배열 복원) */
     div[data-testid="stRadio"] > div[role="radiogroup"] {
         display: flex !important;
         flex-direction: row !important;
-        gap: 6px !important;
-        margin-bottom: -2px !important;
-        z-index: 5 !important;
+        flex-wrap: wrap !important;
+        gap: 18px !important;
+        padding: 6px 4px 10px 4px !important;
+        align-items: center !important;
     }
 
-    /* OFF 버튼: 차분한 소프트 슬레이트 */
     div[data-testid="stRadio"] > div[role="radiogroup"] > label {
-        background-color: #E2E8F0 !important;
-        border: 1.5px solid #CBD5E1 !important;
-        border-bottom: 2px solid #CBD5E1 !important;
-        border-radius: 8px 8px 0 0 !important;
-        padding: 8px 20px !important;
-        margin: 0 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 8px !important;
         cursor: pointer !important;
-        transition: all 0.15s ease !important;
+        margin: 0 !important;
+        padding: 4px 8px !important;
+        border-radius: 4px !important;
+        background: transparent !important;
     }
+
+    div[data-testid="stRadio"] > div[role="radiogroup"] > label:hover {
+        background-color: rgba(0, 0, 0, 0.04) !important;
+    }
+
     div[data-testid="stRadio"] > div[role="radiogroup"] > label div,
     div[data-testid="stRadio"] > div[role="radiogroup"] > label p {
-        color: #475569 !important;
+        color: #1E293B !important;
         font-weight: 600 !important;
         font-size: 0.88rem !important;
     }
-    div[data-testid="stRadio"] > div[role="radiogroup"] > label:hover {
-        background-color: #CBD5E1 !important;
-    }
 
-    div[data-testid="stRadio"] > div[role="radiogroup"] > label input[type="radio"],
-    div[data-testid="stRadio"] > div[role="radiogroup"] > label > div:first-child {
-        display: none !important;
-    }
-
-    /* ON 버튼: 바디와 동일한 화이트 + 하단선 관통 */
-    div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input:checked) {
-        background-color: #FFFFFF !important;
-        border: 2px solid #CBD5E1 !important;
-        border-top: 3px solid #1E3A8A !important;
-        border-bottom: 3px solid #FFFFFF !important;
-        border-radius: 8px 8px 0 0 !important;
-        z-index: 10 !important;
-    }
     div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input:checked) div,
     div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input:checked) p {
         color: #1E3A8A !important;
-        font-weight: 800 !important;
-        font-size: 0.90rem !important;
+        font-weight: 700 !important;
     }
 
     /* 3. 지표(Metric) 카드 */
@@ -776,7 +764,7 @@ def get_stay_duration_str():
         return f"{minutes}분 {seconds}초"
     return "집계 불가"
 
-# [추천 레이아웃] 사이드바 메인 엠블럼 헤더
+# [사이드바 메인 엠블럼 헤더]
 st.sidebar.markdown("""
 <div style="background: linear-gradient(180deg, #13213B 0%, #0F1A2E 100%); border: 1px solid #1E2E4A; border-top: 3px solid #3B82F6; border-radius: 6px; padding: 14px 14px 12px 14px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.2);">
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
@@ -1047,7 +1035,7 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
     st.stop()
 
 # =========================================================================
-# 7. [메인 화면] 메인 캔버스 (헤더는 좌측 사이드바로 이관됨)
+# 7. [메인 화면] 메인 캔버스
 # =========================================================================
 # 전 카테고리 통합 검색: 완벽한 단일 폐쇄형 박스 컨테이너
 search_container = st.container(border=True)
@@ -1131,7 +1119,7 @@ with search_container:
             st.warning(f"'{global_query}'에 대한 검색 결과가 없습니다.")
 
 # =========================================================================
-# 7. [메인 화면] 3. 서류철형(Folder-Tab) 카테고리 선택 버튼 & 일체형 바디
+# 7. [메인 화면] 3. 카테고리 라디오 선택 (원형 체크마크 노출 가로 배열)
 # =========================================================================
 categories = [
     "광고회사 PT 수주 현황", 
@@ -1147,7 +1135,7 @@ selected_category = st.radio(
     label_visibility="collapsed"
 )
 
-# 선택된 버튼과 일체화되는 바디 컨테이너
+# 메인 바디 컨테이너
 body_container = st.container(border=True)
 with body_container:
     # 탭 1: PT 수주 현황
