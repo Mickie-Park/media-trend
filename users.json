@@ -28,5 +28,11 @@
         "password": "6687f0bd315bfa641bd16a5766f11febb133e1618d8a3b53fe614da115c07436",
         "role": "member",
         "approved": true
+    },
+    "boxster78": {
+        "name": "김준식",
+        "password": "37c23345fa0425f0737427f61db3ccc6a0788e03af2e5d49aa4c22dbb0807b86",
+        "role": "member",
+        "approved": false
     }
 }
