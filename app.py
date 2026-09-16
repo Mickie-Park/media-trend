@@ -24,7 +24,7 @@ GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", None)
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "Mickie-Park/media-trend")
 FILE_PATH = "users.json"
 
-# --- 2. 옵션 3 테마 (웜 라이트 펄 #EAE8E3) & 직전 라디오 체크마크 복원 CSS ---
+# --- 2. 옵션 3 테마 (웜 라이트 펄 #EAE8E3) & 검색/바디 순백색(#FFFFFF) 고정 CSS ---
 st.markdown("""
 <style>
     /* 1. 글로벌 표준 Inter + Pretendard 타이포그래피 */
@@ -38,10 +38,19 @@ st.markdown("""
         font-size: 0.90rem !important;
     }
 
-    /* 옵션 3: 웜 라이트 펄 (#EAE8E3) 전체 캔버스 배경 */
+    /* 옵션 3: 웜 라이트 펄 (#EAE8E3) 전체 캔버스 바탕색 */
     .stApp {
         background-color: #EAE8E3 !important;
         color: #1E293B !important;
+    }
+
+    /* [핵심] 통합검색 박스와 메인 내용 박스는 투명하지 않은 순백색(#FFFFFF)으로 고정 */
+    [data-testid="stVerticalBlockBorderWrapper"],
+    [data-testid="stVerticalBlockBorderWrapper"] > div {
+        background-color: #FFFFFF !important;
+        border-color: #CBD5E1 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
     }
 
     /* 메인 본문 최상단 여백 최적화 */
@@ -50,7 +59,7 @@ st.markdown("""
         padding-bottom: 3rem !important;
     }
 
-    /* 2. 카테고리 선택 버튼 (라디오 원형 체크마크 및 가로 배열 복원) */
+    /* 2. 카테고리 라디오 버튼 (원형 체크마크 및 가로 배열 복원) */
     div[data-testid="stRadio"] > div[role="radiogroup"] {
         display: flex !important;
         flex-direction: row !important;
@@ -1035,9 +1044,9 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
     st.stop()
 
 # =========================================================================
-# 7. [메인 화면] 메인 캔버스
+# 7. [메인 화면] 메인 캔버스 (헤더는 좌측 사이드바 상단으로 일원화 배치됨)
 # =========================================================================
-# 전 카테고리 통합 검색: 완벽한 단일 폐쇄형 박스 컨테이너
+# [순백색 고정] 전 카테고리 통합 검색 박스
 search_container = st.container(border=True)
 with search_container:
     st.markdown("""
@@ -1119,7 +1128,7 @@ with search_container:
             st.warning(f"'{global_query}'에 대한 검색 결과가 없습니다.")
 
 # =========================================================================
-# 7. [메인 화면] 3. 카테고리 라디오 선택 (원형 체크마크 노출 가로 배열)
+# 7. [메인 화면] 3. 카테고리 라디오 선택 (원형 체크마크 ◯ / ◉ 가로 정렬)
 # =========================================================================
 categories = [
     "광고회사 PT 수주 현황", 
@@ -1135,7 +1144,7 @@ selected_category = st.radio(
     label_visibility="collapsed"
 )
 
-# 메인 바디 컨테이너
+# [순백색 고정] 메인 바디 컨테이너
 body_container = st.container(border=True)
 with body_container:
     # 탭 1: PT 수주 현황
@@ -1258,7 +1267,7 @@ with body_container:
                             df_yoy_ag = pd.merge(df_prev, df_curr, on="월", how="outer").fillna(0)
                             
                             def month_sort_key(m):
-                                digits = re.findall(r'\d+', str(m))
+                                digits = re.findall(r'\\d+', str(m))
                                 return int(digits[0]) if digits else 99
                             df_yoy_ag["월순서"] = df_yoy_ag["월"].apply(month_sort_key)
                             df_yoy_ag = df_yoy_ag.sort_values(by="월순서").drop(columns=["월순서"])
@@ -1354,7 +1363,7 @@ with body_container:
                             df_yoy_tv = pd.merge(df_prev_tv, df_curr_tv, on="월", how="outer").fillna(0)
                             
                             def month_sort_key(m):
-                                digits = re.findall(r'\d+', str(m))
+                                digits = re.findall(r'\\d+', str(m))
                                 return int(digits[0]) if digits else 99
                             df_yoy_tv["월순서"] = df_yoy_tv["월"].apply(month_sort_key)
                             df_yoy_tv = df_yoy_tv.sort_values(by="월순서").drop(columns=["월순서"])
