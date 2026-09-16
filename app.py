@@ -24,7 +24,7 @@ GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", None)
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "Mickie-Park/media-trend")
 FILE_PATH = "users.json"
 
-# --- 2. CSS 스타일링 (올 화이트 캔버스 + 캡슐형 세그먼트 버튼 + AI 폰트 리사이징) ---
+# --- 2. CSS 스타일링 (올 화이트 캔버스 + 캡슐형 세그먼트 필 버튼 완벽 고정 + AI 폰트 리사이징) ---
 st.markdown("""
 <style>
     /* 1. 글로벌 표준 Inter + Pretendard 타이포그래피 */
@@ -59,57 +59,71 @@ st.markdown("""
         padding-bottom: 3rem !important;
     }
 
-    /* 2. 카테고리 선택: 고급 세그먼트 캡슐 버튼 UI */
+    /* 2. [완벽 강제 적용] 카테고리 캡슐형 세그먼트 버튼 (Segmented Pills) */
     div[data-testid="stRadio"] > div[role="radiogroup"] {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: wrap !important;
         gap: 10px !important;
-        padding: 4px 0 12px 0 !important;
+        padding: 4px 0 14px 0 !important;
         align-items: center !important;
     }
 
-    /* 비선택(OFF) 캡슐 버튼 */
-    div[data-testid="stRadio"] > div[role="radiogroup"] > label {
+    /* 라디오 원형 버튼(동그라미) 완전 제거 */
+    div[data-testid="stRadio"] div[role="radiogroup"] label input[type="radio"],
+    div[data-testid="stRadio"] div[role="radiogroup"] label div:first-child:not([data-testid="stMarkdownContainer"]) {
+        display: none !important;
+        visibility: hidden !important;
+        width: 0 !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* 비선택(OFF) 캡슐: 흰색 바탕 + 은은한 테두리 */
+    div[data-testid="stRadio"] div[role="radiogroup"] label,
+    div[data-testid="stRadio"] div[role="radiogroup"] label[data-baseweb="radio"] {
         display: inline-flex !important;
         align-items: center !important;
-        gap: 8px !important;
+        justify-content: center !important;
         cursor: pointer !important;
         margin: 0 !important;
-        padding: 7px 16px !important;
+        padding: 7px 18px !important;
         border-radius: 20px !important;
-        background-color: #F8FAFC !important;
+        background-color: #FFFFFF !important;
         border: 1px solid #CBD5E1 !important;
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
         transition: all 0.15s ease !important;
     }
 
-    div[data-testid="stRadio"] > div[role="radiogroup"] > label:hover {
-        background-color: #F1F5F9 !important;
+    div[data-testid="stRadio"] div[role="radiogroup"] label:hover {
+        background-color: #F8FAFC !important;
         border-color: #94A3B8 !important;
     }
 
-    div[data-testid="stRadio"] > div[role="radiogroup"] > label div,
-    div[data-testid="stRadio"] > div[role="radiogroup"] > label p {
+    div[data-testid="stRadio"] div[role="radiogroup"] label [data-testid="stMarkdownContainer"] p,
+    div[data-testid="stRadio"] div[role="radiogroup"] label span {
         color: #475569 !important;
         font-weight: 600 !important;
         font-size: 0.86rem !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
 
-    /* 선택(ON) 캡슐 버튼: 뚜렷한 네이비 테두리와 소프트 틴트 */
-    div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input:checked) {
+    /* 선택(ON) 캡슐: 진한 네이비 테두리 + 연한 블루 틴트 바탕 */
+    div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) {
         background-color: #EFF6FF !important;
         border: 1.5px solid #1E3A8A !important;
-        box-shadow: 0 1px 4px rgba(30, 58, 138, 0.12) !important;
+        box-shadow: 0 1px 4px rgba(30, 58, 138, 0.15) !important;
     }
 
-    div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input:checked) div,
-    div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input:checked) p {
+    div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) [data-testid="stMarkdownContainer"] p,
+    div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) span {
         color: #1E3A8A !important;
         font-weight: 700 !important;
     }
 
-    /* 3. [핵심] AI 동향 분석가 답변 마크다운 폰트 스케일 다운 */
+    /* 3. AI 동향 분석가 답변 마크다운 폰트 스케일 다운 */
     .ai-report-box h1 {
         font-size: 1.25rem !important;
         font-weight: 800 !important;
@@ -166,7 +180,7 @@ st.markdown("""
         letter-spacing: -0.02em;
     }
 
-    /* 5. 사이드바 UI (다크 네이비 테마 유지) */
+    /* 5. 사이드바 UI */
     [data-testid="stSidebar"] {
         background-color: #0C1A30 !important;
         border-right: 1px solid #1E2E4A !important;
@@ -238,8 +252,7 @@ st.markdown("""
         font-size: 0.78rem !important;
         background: transparent !important;
     }
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] small,
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] span {
+    [data-testid="stSidebar"] small, [data-testid="stSidebar"] span {
         color: #94A3B8 !important;
         font-size: 0.76rem !important;
         background: transparent !important;
@@ -536,7 +549,7 @@ def load_all_data():
                     }
                     
                     for c_i, c_val in enumerate(row_cells):
-                        c_clean = c_val.replace(" ", "").replace("\n", "")
+                        c_clean = c_val.replace(" ", "").replace("\\n", "")
                         if "일자" in c_clean: col_map["date"] = c_i
                         elif "광고주" in c_clean: col_map["client"] = c_i
                         elif "품목" in c_clean or "과제" in c_clean: col_map["product"] = c_i
@@ -1092,7 +1105,6 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
 # =========================================================================
 # 7. [메인 화면] 메인 캔버스
 # =========================================================================
-# [순백색 고정] 전 카테고리 통합 검색 박스
 search_container = st.container(border=True)
 with search_container:
     st.markdown("""
@@ -1174,7 +1186,7 @@ with search_container:
             st.warning(f"'{global_query}'에 대한 검색 결과가 없습니다.")
 
 # =========================================================================
-# 7. [메인 화면] 3. 카테고리 라디오 선택 (세그먼트 캡슐 버튼 UI)
+# 7. [메인 화면] 3. 카테고리 세그먼트 캡슐 버튼 선택
 # =========================================================================
 categories = [
     "광고회사 PT 수주 현황", 
@@ -1190,7 +1202,7 @@ selected_category = st.radio(
     label_visibility="collapsed"
 )
 
-# [순백색 고정] 메인 바디 컨테이너
+# 메인 바디 컨테이너
 body_container = st.container(border=True)
 with body_container:
     # 탭 1: PT 수주 현황
@@ -1313,7 +1325,7 @@ with body_container:
                             df_yoy_ag = pd.merge(df_prev, df_curr, on="월", how="outer").fillna(0)
                             
                             def month_sort_key(m):
-                                digits = re.findall(r'\d+', str(m))
+                                digits = re.findall(r'\\d+', str(m))
                                 return int(digits[0]) if digits else 99
                             df_yoy_ag["월순서"] = df_yoy_ag["월"].apply(month_sort_key)
                             df_yoy_ag = df_yoy_ag.sort_values(by="월순서").drop(columns=["월순서"])
@@ -1409,7 +1421,7 @@ with body_container:
                             df_yoy_tv = pd.merge(df_prev_tv, df_curr_tv, on="월", how="outer").fillna(0)
                             
                             def month_sort_key(m):
-                                digits = re.findall(r'\d+', str(m))
+                                digits = re.findall(r'\\d+', str(m))
                                 return int(digits[0]) if digits else 99
                             df_yoy_tv["월순서"] = df_yoy_tv["월"].apply(month_sort_key)
                             df_yoy_tv = df_yoy_tv.sort_values(by="월순서").drop(columns=["월순서"])
@@ -1521,7 +1533,6 @@ with body_container:
                         )
                         
                         st.markdown("##### 🏛️ 인텔리전스 종합 분석 리포트")
-                        # 전용 클래스(.ai-report-box)로 감싸서 폰트 크기를 표준 규격으로 다운스케일링
                         st.markdown(f'<div class="ai-report-box">{response.text}</div>', unsafe_allow_html=True)
             except Exception as e:
                 err_msg = str(e)
