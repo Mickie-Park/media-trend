@@ -503,7 +503,7 @@ def load_all_data():
                     }
                     
                     for c_i, c_val in enumerate(row_cells):
-                        c_clean = c_val.replace(" ", "").replace("\n", "")
+                        c_clean = c_val.replace(" ", "").replace("\\n", "")
                         if "일자" in c_clean: col_map["date"] = c_i
                         elif "광고주" in c_clean: col_map["client"] = c_i
                         elif "품목" in c_clean or "과제" in c_clean: col_map["product"] = c_i
@@ -1268,7 +1268,7 @@ with body_container:
                             df_yoy_ag = pd.merge(df_prev, df_curr, on="월", how="outer").fillna(0)
                             
                             def month_sort_key(m):
-                                digits = re.findall(r'\d+', str(m))
+                                digits = re.findall(r'\\d+', str(m))
                                 return int(digits[0]) if digits else 99
                             df_yoy_ag["월순서"] = df_yoy_ag["월"].apply(month_sort_key)
                             df_yoy_ag = df_yoy_ag.sort_values(by="월순서").drop(columns=["월순서"])
@@ -1364,7 +1364,7 @@ with body_container:
                             df_yoy_tv = pd.merge(df_prev_tv, df_curr_tv, on="월", how="outer").fillna(0)
                             
                             def month_sort_key(m):
-                                digits = re.findall(r'\d+', str(m))
+                                digits = re.findall(r'\\d+', str(m))
                                 return int(digits[0]) if digits else 99
                             df_yoy_tv["월순서"] = df_yoy_tv["월"].apply(month_sort_key)
                             df_yoy_tv = df_yoy_tv.sort_values(by="월순서").drop(columns=["월순서"])
@@ -1427,9 +1427,9 @@ with body_container:
         else:
             try:
                 genai.configure(api_key=api_key)
-                target_model = "gemini-2.5-flash"
+                target_model = "gemini-3.6-flash"
                 model = genai.GenerativeModel(target_model)
-                st.caption(f"연결 모델: `{target_model}` | 통합 분석 데이터셋: PT {len(df_pt_unique):,}건, 대행사매출 {len(df_agency):,}건, 매체사매출 {len(df_tv):,}건, 이슈 {len(df_issues):,}건")
+                st.caption(f"연결 모델: `{target_model}` | 통합 분석 데이터 풀: PT {len(df_pt_unique):,}건, 대행사매출 {len(df_agency):,}건, 매체사매출 {len(df_tv):,}건, 이슈 {len(df_issues):,}건")
                 
                 user_question = st.text_input("질문을 입력하세요", placeholder="예: 제일기획의 주요 수주 프로젝트와 전파광고 매출 추이의 특징을 분석해줘")
                 
