@@ -27,6 +27,6 @@
         "name": "유저티",
         "password": "6687f0bd315bfa641bd16a5766f11febb133e1618d8a3b53fe614da115c07436",
         "role": "member",
-        "approved": false
+        "approved": true
     }
 }
