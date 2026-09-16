@@ -24,7 +24,7 @@ GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", None)
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "Mickie-Park/media-trend")
 FILE_PATH = "users.json"
 
-# --- 2. CSS 스타일링 (올 화이트 캔버스 + 캡슐형 세그먼트 필 버튼 완벽 고정 + AI 폰트 리사이징) ---
+# --- 2. CSS 스타일링 (올 화이트 캔버스 + 캡슐 버튼 내 라디오 마크 결합 + 스카이블루 검색바 테두리) ---
 st.markdown("""
 <style>
     /* 1. 글로벌 표준 Inter + Pretendard 타이포그래피 */
@@ -59,71 +59,77 @@ st.markdown("""
         padding-bottom: 3rem !important;
     }
 
-    /* 2. [완벽 강제 적용] 카테고리 캡슐형 세그먼트 버튼 (Segmented Pills) */
+    /* 2. [캡슐 버튼 + 라디오 원형 체크마크 결합] */
     div[data-testid="stRadio"] > div[role="radiogroup"] {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: wrap !important;
-        gap: 10px !important;
+        gap: 12px !important;
         padding: 4px 0 14px 0 !important;
         align-items: center !important;
     }
 
-    /* 라디오 원형 버튼(동그라미) 완전 제거 */
-    div[data-testid="stRadio"] div[role="radiogroup"] label input[type="radio"],
-    div[data-testid="stRadio"] div[role="radiogroup"] label div:first-child:not([data-testid="stMarkdownContainer"]) {
-        display: none !important;
-        visibility: hidden !important;
-        width: 0 !important;
-        height: 0 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-    }
-
-    /* 비선택(OFF) 캡슐: 흰색 바탕 + 은은한 테두리 */
-    div[data-testid="stRadio"] div[role="radiogroup"] label,
-    div[data-testid="stRadio"] div[role="radiogroup"] label[data-baseweb="radio"] {
+    /* 캡슐 알약 형태의 외곽 박스 (OFF 상태) */
+    div[data-testid="stRadio"] div[role="radiogroup"] label {
         display: inline-flex !important;
         align-items: center !important;
-        justify-content: center !important;
+        gap: 8px !important;
         cursor: pointer !important;
         margin: 0 !important;
         padding: 7px 18px !important;
-        border-radius: 20px !important;
-        background-color: #FFFFFF !important;
-        border: 1px solid #CBD5E1 !important;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
-        transition: all 0.15s ease !important;
+        border-radius: 24px !important;
+        background-color: #F8FAFC !important;
+        border: 1.5px solid #CBD5E1 !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+        transition: all 0.18s ease-in-out !important;
     }
 
+    /* OFF 캡슐 호버 효과 */
     div[data-testid="stRadio"] div[role="radiogroup"] label:hover {
-        background-color: #F8FAFC !important;
+        background-color: #F1F5F9 !important;
         border-color: #94A3B8 !important;
     }
 
-    div[data-testid="stRadio"] div[role="radiogroup"] label [data-testid="stMarkdownContainer"] p,
-    div[data-testid="stRadio"] div[role="radiogroup"] label span {
+    div[data-testid="stRadio"] div[role="radiogroup"] label [data-testid="stMarkdownContainer"] p {
         color: #475569 !important;
         font-weight: 600 !important;
         font-size: 0.86rem !important;
         margin: 0 !important;
-        padding: 0 !important;
     }
 
-    /* 선택(ON) 캡슐: 진한 네이비 테두리 + 연한 블루 틴트 바탕 */
+    /* 선택된 캡슐 (ON 상태): 블루 틴트 배경 + 다크 네이비 테두리 */
     div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) {
         background-color: #EFF6FF !important;
         border: 1.5px solid #1E3A8A !important;
-        box-shadow: 0 1px 4px rgba(30, 58, 138, 0.15) !important;
+        box-shadow: 0 2px 6px rgba(30, 58, 138, 0.14) !important;
     }
 
-    div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) [data-testid="stMarkdownContainer"] p,
-    div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) span {
+    div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) [data-testid="stMarkdownContainer"] p {
         color: #1E3A8A !important;
         font-weight: 700 !important;
     }
 
-    /* 3. AI 동향 분석가 답변 마크다운 폰트 스케일 다운 */
+    /* 3. 검색바(통합검색 및 AI 입력창) 세련된 스카이블루 액센트 테두리 */
+    .stApp div[data-testid="stTextInput"] input {
+        background-color: #FFFFFF !important;
+        border: 1.5px solid #93C5FD !important; /* 소프트 스카이블루 기본 테두리 */
+        border-radius: 6px !important;
+        font-size: 0.88rem !important;
+        min-height: 42px !important;
+        padding-left: 14px !important;
+        color: #0F172A !important;
+        box-shadow: 0 1px 2px rgba(59, 130, 246, 0.05) !important;
+        transition: all 0.2s ease !important;
+    }
+
+    /* 검색바 포커스(클릭/입력 중) 상태: 일렉트릭 블루 글로우 */
+    .stApp div[data-testid="stTextInput"] input:focus {
+        border: 2px solid #2563EB !important;
+        box-shadow: 0 0 0 3.5px rgba(37, 99, 235, 0.15) !important;
+        outline: none !important;
+    }
+
+    /* 4. AI 동향 분석가 답변 마크다운 폰트 스케일 다운 */
     .ai-report-box h1 {
         font-size: 1.25rem !important;
         font-weight: 800 !important;
@@ -157,7 +163,7 @@ st.markdown("""
         font-weight: 700 !important;
     }
 
-    /* 4. 지표(Metric) 카드 */
+    /* 5. 지표(Metric) 카드 */
     [data-testid="stMetric"] {
         background-color: #F8FAFC !important;
         padding: 14px 18px !important;
@@ -180,7 +186,7 @@ st.markdown("""
         letter-spacing: -0.02em;
     }
 
-    /* 5. 사이드바 UI */
+    /* 6. 사이드바 UI (다크 네이비 테마 유지) */
     [data-testid="stSidebar"] {
         background-color: #0C1A30 !important;
         border-right: 1px solid #1E2E4A !important;
@@ -276,7 +282,7 @@ st.markdown("""
         height: 34px !important;
     }
 
-    div[data-baseweb="select"] > div, .stApp > div:not([data-testid="stSidebar"]) .stTextInput input {
+    div[data-baseweb="select"] > div {
         border-color: #CBD5E1 !important;
         border-radius: 4px !important;
         background-color: #FFFFFF !important;
@@ -1105,6 +1111,7 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
 # =========================================================================
 # 7. [메인 화면] 메인 캔버스
 # =========================================================================
+# [순백색 고정] 전 카테고리 통합 검색 박스
 search_container = st.container(border=True)
 with search_container:
     st.markdown("""
@@ -1186,7 +1193,7 @@ with search_container:
             st.warning(f"'{global_query}'에 대한 검색 결과가 없습니다.")
 
 # =========================================================================
-# 7. [메인 화면] 3. 카테고리 세그먼트 캡슐 버튼 선택
+# 7. [메인 화면] 3. 카테고리 캡슐 버튼 선택 (라디오 원형 체크마크 ◯ / ◉ 결합)
 # =========================================================================
 categories = [
     "광고회사 PT 수주 현황", 
@@ -1202,7 +1209,7 @@ selected_category = st.radio(
     label_visibility="collapsed"
 )
 
-# 메인 바디 컨테이너
+# [순백색 고정] 메인 바디 컨테이너
 body_container = st.container(border=True)
 with body_container:
     # 탭 1: PT 수주 현황
@@ -1325,7 +1332,7 @@ with body_container:
                             df_yoy_ag = pd.merge(df_prev, df_curr, on="월", how="outer").fillna(0)
                             
                             def month_sort_key(m):
-                                digits = re.findall(r'\\d+', str(m))
+                                digits = re.findall(r'\d+', str(m))
                                 return int(digits[0]) if digits else 99
                             df_yoy_ag["월순서"] = df_yoy_ag["월"].apply(month_sort_key)
                             df_yoy_ag = df_yoy_ag.sort_values(by="월순서").drop(columns=["월순서"])
@@ -1421,7 +1428,7 @@ with body_container:
                             df_yoy_tv = pd.merge(df_prev_tv, df_curr_tv, on="월", how="outer").fillna(0)
                             
                             def month_sort_key(m):
-                                digits = re.findall(r'\\d+', str(m))
+                                digits = re.findall(r'\d+', str(m))
                                 return int(digits[0]) if digits else 99
                             df_yoy_tv["월순서"] = df_yoy_tv["월"].apply(month_sort_key)
                             df_yoy_tv = df_yoy_tv.sort_values(by="월순서").drop(columns=["월순서"])
@@ -1473,7 +1480,7 @@ with body_container:
         else:
             st.info("이슈 데이터가 없습니다.")
 
-    # 탭 4: AI 동향 분석가 (전수 빅데이터 무제한 통합 분석 파이프라인 + 리포트 폰트 스케일링)
+    # 탭 4: AI 동향 분석가 (전수 빅데이터 무제한 통합 분석 파이프라인 + 리포트 폰트 다운스케일)
     elif selected_category == "AI 동향 분석가":
         st.markdown("<h3 style='font-size: 1.20rem; font-weight: 700; color: #0F172A; margin-bottom: 2px;'>AI 기반 인텔리전스 분석 어시스턴트</h3>", unsafe_allow_html=True)
         st.caption("대시보드에 축적된 4대 핵심 빅데이터(경쟁 PT 전수, 대행사·매체사 매출 실적, 월별 핵심 이슈)를 100% 전수 분석합니다.")
