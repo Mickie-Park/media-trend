@@ -415,7 +415,7 @@ if auth_token and not st.session_state["logged_in"]:
         st.session_state["user_name"] = users_current[auth_token].get("name", auth_token)
         st.session_state["login_time"] = get_now_kst()
 
-# --- 3. [완벽 검증] 원본 엑셀 실데이터 구조 기반 정확한 파싱 함수 ---
+# --- 3. [최신 파일 우선 정렬 & 원본 구조 기반 파싱 함수] ---
 @st.cache_data
 def load_all_data():
     raw_files = glob.glob("**/*.[xX][lL][sS][xX]", recursive=True)
@@ -427,7 +427,12 @@ def load_all_data():
         if "업계동향" in filename or "data" in f.lower():
             all_files.append(f)
             
-    all_files = sorted(list(set(all_files)))
+    # [핵심] 파일명 속 YYYYMM 점수를 산출하여 최신 파일(예: 202607)이 먼저 오도록 내림차순 정렬
+    def get_file_ym_score(filepath):
+        m = re.search(r'(\d{4})(\d{2})', filepath)
+        return int(m.group(1) + m.group(2)) if m else 0
+        
+    all_files = sorted(list(set(all_files)), key=get_file_ym_score, reverse=True)
     
     issues_list = []
     tv_sales_list = []
@@ -763,9 +768,26 @@ if not st.session_state["logged_in"]:
                     st.success("회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인하실 수 있습니다.")
     st.stop()
 
-# --- 5. 로그인 성공 후 사이드바 제어판 ---
+# --- 5. 로그인 성공 후 사이드바 제어판 및 [유사건 유추 최신 데이터 우선 병합] ---
 df_issues, df_tv, df_pt, df_agency, loaded_files = load_all_data()
-df_pt_unique = df_pt.drop_duplicates(subset=["PT일자", "광고주", "품목"]) if not df_pt.empty else pd.DataFrame()
+
+# [핵심 로직] 동일/유사 PT건 판별을 위한 문자열 정규화 함수
+def normalize_match_key(text):
+    if not text:
+        return ""
+    return re.sub(r'[\s\(\)\[\]_\-.,·/]', '', str(text)).lower()
+
+if not df_pt.empty:
+    # PT일자, 정규화된 광고주명, 품목명을 조합한 고유 매칭 키 생성
+    df_pt["_dedup_key"] = (
+        df_pt["PT일자"].astype(str).str.strip() + "||" +
+        df_pt["광고주"].apply(normalize_match_key) + "||" +
+        df_pt["품목"].apply(normalize_match_key)
+    )
+    # 최신 파일 순서로 읽어왔으므로 keep='first'로 최신 업데이트 정보를 최우선 채택
+    df_pt_unique = df_pt.drop_duplicates(subset=["_dedup_key"], keep="first").drop(columns=["_dedup_key"])
+else:
+    df_pt_unique = pd.DataFrame()
 
 def get_stay_duration_str():
     if st.session_state.get("login_time"):
@@ -1268,7 +1290,7 @@ with body_container:
                             df_yoy_ag = pd.merge(df_prev, df_curr, on="월", how="outer").fillna(0)
                             
                             def month_sort_key(m):
-                                digits = re.findall(r'\\d+', str(m))
+                                digits = re.findall(r'\d+', str(m))
                                 return int(digits[0]) if digits else 99
                             df_yoy_ag["월순서"] = df_yoy_ag["월"].apply(month_sort_key)
                             df_yoy_ag = df_yoy_ag.sort_values(by="월순서").drop(columns=["월순서"])
@@ -1364,7 +1386,7 @@ with body_container:
                             df_yoy_tv = pd.merge(df_prev_tv, df_curr_tv, on="월", how="outer").fillna(0)
                             
                             def month_sort_key(m):
-                                digits = re.findall(r'\\d+', str(m))
+                                digits = re.findall(r'\d+', str(m))
                                 return int(digits[0]) if digits else 99
                             df_yoy_tv["월순서"] = df_yoy_tv["월"].apply(month_sort_key)
                             df_yoy_tv = df_yoy_tv.sort_values(by="월순서").drop(columns=["월순서"])
