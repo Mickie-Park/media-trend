@@ -22,5 +22,11 @@
         "password": "39da2bbb3ce9997b2d82e7fb2412da366d2512c83711a450a87d8b0eb1cc9e37",
         "role": "member",
         "approved": true
+    },
+    "usert": {
+        "name": "유저티",
+        "password": "6687f0bd315bfa641bd16a5766f11febb133e1618d8a3b53fe614da115c07436",
+        "role": "member",
+        "approved": false
     }
 }
