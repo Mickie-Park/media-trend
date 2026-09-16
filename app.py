@@ -1416,10 +1416,10 @@ with body_container:
         else:
             st.info("이슈 데이터가 없습니다.")
 
-    # 탭 4: AI 동향 분석가
+    # 탭 4: AI 동향 분석가 (전 카테고리 무제한 통합 분석 파이프라인)
     elif selected_category == "AI 동향 분석가":
         st.markdown("<h3 style='font-size: 1.20rem; font-weight: 700; color: #0F172A; margin-bottom: 2px;'>AI 기반 인텔리전스 분석 어시스턴트</h3>", unsafe_allow_html=True)
-        st.caption("적재된 빅데이터를 바탕으로 구글 Gemini 모델이 질문에 실시간 답변합니다.")
+        st.caption("대시보드에 축적된 전 카테고리 빅데이터(경쟁 PT, 대행사·매체사 매출 실적, 월별 핵심 이슈)를 통합 분석합니다.")
         st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
         
         if not api_key:
@@ -1427,34 +1427,99 @@ with body_container:
         else:
             try:
                 genai.configure(api_key=api_key)
-                target_model = "gemini-3.6-flash"
+                target_model = "gemini-2.5-flash"
                 model = genai.GenerativeModel(target_model)
-                st.caption(f"연결 모델: `{target_model}`")
+                st.caption(f"연결 모델: `{target_model}` | 통합 분석 데이터셋: PT {len(df_pt_unique):,}건, 대행사매출 {len(df_agency):,}건, 매체사매출 {len(df_tv):,}건, 이슈 {len(df_issues):,}건")
                 
-                user_question = st.text_input("질문을 입력하세요", placeholder="예: 최근 주요 광고주 PT 동향을 요약해줘")
+                user_question = st.text_input("질문을 입력하세요", placeholder="예: 제일기획의 주요 수주 프로젝트와 전파광고 매출 추이의 특징을 분석해줘")
                 
                 if st.button("AI 분석 요청", type="primary") and user_question:
-                    with st.spinner("동향 데이터를 기반으로 분석을 생성 중입니다..."):
-                        context_issues = df_issues.head(40).to_string(index=False)
-                        context_pt = df_pt_unique.head(30).to_string(index=False)
+                    with st.spinner("전체 카테고리 데이터베이스를 전수 스캔하여 심층 리포트를 작성 중입니다..."):
+                        # 1. 질문 키워드 정규식 토큰화
+                        tokens = [t.strip() for t in re.split(r'\s+|[?,!.]', user_question) if len(t.strip()) >= 2]
                         
+                        # 2. PT 데이터 다이내믹 스마트 컨텍스트 구축
+                        target_pt = pd.DataFrame()
+                        if not df_pt_unique.empty:
+                            mask_pt = pd.Series(False, index=df_pt_unique.index)
+                            for tk in tokens:
+                                mask_pt |= (
+                                    df_pt_unique["광고주"].str.contains(tk, case=False, na=False) |
+                                    df_pt_unique["품목"].str.contains(tk, case=False, na=False) |
+                                    df_pt_unique["선정사(결과)"].str.contains(tk, case=False, na=False) |
+                                    df_pt_unique["기존사"].str.contains(tk, case=False, na=False) |
+                                    df_pt_unique["참여사"].str.contains(tk, case=False, na=False) |
+                                    df_pt_unique["메모(비고)"].str.contains(tk, case=False, na=False)
+                                )
+                            matched_pt = df_pt_unique[mask_pt]
+                            other_pt = df_pt_unique[~mask_pt].head(100)
+                            target_pt = pd.concat([matched_pt, other_pt]).drop_duplicates().head(300)
+                        
+                        # 3. 대행사 매출 데이터 스마트 검색
+                        target_agency = pd.DataFrame()
+                        if not df_agency.empty:
+                            mask_ag = pd.Series(False, index=df_agency.index)
+                            for tk in tokens:
+                                mask_ag |= df_agency["대행사"].str.contains(tk, case=False, na=False)
+                            if mask_ag.any():
+                                target_agency = df_agency[mask_ag]
+                            else:
+                                target_agency = df_agency.tail(120)
+                        
+                        # 4. 방송 매체사 매출 데이터 스마트 검색
+                        target_tv = pd.DataFrame()
+                        if not df_tv.empty:
+                            mask_tv = pd.Series(False, index=df_tv.index)
+                            for tk in tokens:
+                                mask_tv |= df_tv["채널"].str.contains(tk, case=False, na=False)
+                            if mask_tv.any():
+                                target_tv = df_tv[mask_tv]
+                            else:
+                                target_tv = df_tv.tail(120)
+
+                        # 5. 월별 업계 이슈 스마트 검색
+                        target_issues = pd.DataFrame()
+                        if not df_issues.empty:
+                            mask_is = pd.Series(False, index=df_issues.index)
+                            for tk in tokens:
+                                mask_is |= (
+                                    df_issues["헤드라인"].str.contains(tk, case=False, na=False) |
+                                    df_issues["상세"].str.contains(tk, case=False, na=False)
+                                )
+                            matched_is = df_issues[mask_is]
+                            other_is = df_issues[~mask_is].head(60)
+                            target_issues = pd.concat([matched_is, other_is]).drop_duplicates().head(120)
+
+                        # 텍스트 포맷 변환
+                        pt_ctx = target_pt[["PT일자", "광고주", "품목", "빌링(억원)", "기존사", "참여사", "선정사(결과)", "메모(비고)"]].to_string(index=False) if not target_pt.empty else "데이터 없음"
+                        ag_ctx = target_agency[["연월", "대행사", "매출(억원)"]].to_string(index=False) if not target_agency.empty else "데이터 없음"
+                        tv_ctx = target_tv[["연월", "구분", "채널", "매출(억원)"]].to_string(index=False) if not target_tv.empty else "데이터 없음"
+                        is_ctx = target_issues[["연월", "헤드라인", "상세"]].to_string(index=False) if not target_issues.empty else "데이터 없음"
+
                         prompt = f"""
-당신은 대한민국 미디어·방송·광고 업계 전문 분석가입니다.
-아래 제공된 [월별 업계 이슈 데이터]와 [광고회사 PT 현황 데이터]를 기반으로 질문에 명확하고 간결하게 답변해 주세요.
+당신은 대한민국 미디어·방송·광고 업계 전문 수석 전략 컨설턴트입니다.
+아래 제공된 대시보드 전 카테고리 통합 데이터([광고회사 PT 수주 현황], [대행사 전파광고 매출], [방송 매체사 매출], [월별 업계 주요 이슈])를 전방위로 면밀히 분석하여 질문에 전문적이고 명쾌하게 답변해 주세요.
 
-[월별 업계 이슈 데이터]
-{context_issues}
+[1. 광고회사 PT 수주 현황 데이터]
+{pt_ctx}
 
-[최근 주요 PT 현황]
-{context_pt}
+[2. 대행사 전파광고 매출 데이터]
+{ag_ctx}
+
+[3. 방송 매체사 광고 매출 데이터]
+{tv_ctx}
+
+[4. 월별 업계 주요 이슈 브리핑 데이터]
+{is_ctx}
 
 [질문]
 {user_question}
 
-지침:
-1. 제공된 데이터의 구체적 사실(기업명, 수치 등)을 기반으로 작성하세요.
-2. 가독성을 위해 불릿 포인트로 정리하세요.
-3. 데이터에 없는 내용은 추측하지 마세요.
+작성 지침:
+1. 반드시 제공된 데이터에 실제로 기록된 사실(일자, 기업명, 품목, 수치, 금액, 수주 결과)을 구체적으로 인용하며 서술하세요.
+2. 특정 대행사나 매체사에 대한 질의인 경우, PT 수주 성과와 매출 추이, 관련 업계 이슈를 입체적으로 교차 검증하여 종합 인사이트를 제시하세요.
+3. 가독성을 위해 불릿 포인트와 핵심 키워드 볼드(**)를 적극 활용하여 보고서 형태로 정돈하세요.
+4. 데이터에 기재되지 않은 내용은 억측하지 말고 사실에 기반하여 답변하세요.
 """
                         response = model.generate_content(prompt)
                         
@@ -1465,7 +1530,7 @@ with body_container:
                             f"질문: {user_question[:40]}..."
                         )
                         
-                        st.markdown("##### 인텔리전스 분석 리포트")
+                        st.markdown("##### 🏛️ 인텔리전스 종합 분석 리포트")
                         st.markdown(response.text)
             except Exception as e:
                 err_msg = str(e)
