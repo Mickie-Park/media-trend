@@ -427,7 +427,6 @@ def load_all_data():
         if "업계동향" in filename or "data" in f.lower():
             all_files.append(f)
             
-    # [핵심] 파일명 속 YYYYMM 점수를 산출하여 최신 파일(예: 202607)이 먼저 오도록 내림차순 정렬
     def get_file_ym_score(filepath):
         m = re.search(r'(\d{4})(\d{2})', filepath)
         return int(m.group(1) + m.group(2)) if m else 0
@@ -500,7 +499,6 @@ def load_all_data():
                 row_cells = [clean_str(x) for x in df.iloc[p_idx].tolist()]
                 row_text_no_space = "".join(row_cells).replace(" ", "")
                 
-                # 공백 무관하게 'PT일자'와 '광고주' 인식
                 if "PT일자" in row_text_no_space and "광고주" in row_text_no_space:
                     col_map = {
                         "date": 0, "client": 1, "product": 2, "billing": 3,
@@ -523,7 +521,6 @@ def load_all_data():
                         row_full_str = " ".join([clean_str(x) for x in sub_row])
                         row_full_nospace = row_full_str.replace(" ", "")
                         
-                        # 다음 섹션 (전파광고 매출, 방송사 매출 등) 진입 시 즉시 중단
                         if any(stop_kw in row_full_nospace for stop_kw in ["전파", "지상파", "종편", "방송사매출", "매출_", "공중파"]):
                             break
                         if "PT일자" in row_full_nospace and "광고주" in row_full_nospace:
@@ -532,7 +529,6 @@ def load_all_data():
                         client_val = clean_str(sub_row[col_map["client"]]) if col_map["client"] < len(sub_row) else ""
                         date_cell = sub_row[col_map["date"]] if col_map["date"] < len(sub_row) else ""
                         
-                        # 1. 정크 광고주 행 필터 (SUM, 합산, 단위, WPP 등)
                         if not client_val or client_val in ["광고주", "합계", "소계", "Total", "SUM"]:
                             continue
                         if any(junk_kw in client_val for junk_kw in ["광고회사", "종합편", "단위", "합산", "계수", "WPP Media", "Group M"]):
@@ -547,7 +543,6 @@ def load_all_data():
                                 if len(date_str) >= 10 and date_str[:10].replace("-", "").isdigit():
                                     date_str = date_str[:10]
 
-                        # 2. 날짜 유효성 검사 (빈칸이거나 단순 숫자, SUM 표기 등 배제)
                         if not date_str or date_str.isdigit() or any(k in date_str for k in ["SUM", "단위", "WPP"]):
                             continue
 
@@ -771,20 +766,17 @@ if not st.session_state["logged_in"]:
 # --- 5. 로그인 성공 후 사이드바 제어판 및 [유사건 유추 최신 데이터 우선 병합] ---
 df_issues, df_tv, df_pt, df_agency, loaded_files = load_all_data()
 
-# [핵심 로직] 동일/유사 PT건 판별을 위한 문자열 정규화 함수
 def normalize_match_key(text):
     if not text:
         return ""
     return re.sub(r'[\s\(\)\[\]_\-.,·/]', '', str(text)).lower()
 
 if not df_pt.empty:
-    # PT일자, 정규화된 광고주명, 품목명을 조합한 고유 매칭 키 생성
     df_pt["_dedup_key"] = (
         df_pt["PT일자"].astype(str).str.strip() + "||" +
         df_pt["광고주"].apply(normalize_match_key) + "||" +
         df_pt["품목"].apply(normalize_match_key)
     )
-    # 최신 파일 순서로 읽어왔으므로 keep='first'로 최신 업데이트 정보를 최우선 채택
     df_pt_unique = df_pt.drop_duplicates(subset=["_dedup_key"], keep="first").drop(columns=["_dedup_key"])
 else:
     df_pt_unique = pd.DataFrame()
@@ -1206,7 +1198,6 @@ with body_container:
             if winner_search:
                 view_pt = view_pt[view_pt["선정사(결과)"].str.contains(winner_search, na=False)]
 
-            # 원본 엑셀 컬럼 배열과 100% 일치: PT일자 -> 광고주 -> 품목 -> 빌링 -> 기존사 -> 참여사 -> 선정사(결과) -> 메모(비고)
             st.dataframe(
                 view_pt[["PT일자", "광고주", "품목", "빌링_원문", "기존사", "참여사", "선정사(결과)", "메모(비고)"]].rename(columns={"빌링_원문": "빌링(억원)"}),
                 use_container_width=True,
@@ -1438,10 +1429,10 @@ with body_container:
         else:
             st.info("이슈 데이터가 없습니다.")
 
-    # 탭 4: AI 동향 분석가 (전 카테고리 무제한 통합 분석 파이프라인)
+    # 탭 4: AI 동향 분석가 (전수 빅데이터 무제한 통합 분석 파이프라인)
     elif selected_category == "AI 동향 분석가":
         st.markdown("<h3 style='font-size: 1.20rem; font-weight: 700; color: #0F172A; margin-bottom: 2px;'>AI 기반 인텔리전스 분석 어시스턴트</h3>", unsafe_allow_html=True)
-        st.caption("대시보드에 축적된 전 카테고리 빅데이터(경쟁 PT, 대행사·매체사 매출 실적, 월별 핵심 이슈)를 통합 분석합니다.")
+        st.caption("대시보드에 축적된 4대 핵심 빅데이터(경쟁 PT 전수, 대행사·매체사 매출 실적, 월별 핵심 이슈)를 100% 전수 분석합니다.")
         st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
         
         if not api_key:
@@ -1451,97 +1442,43 @@ with body_container:
                 genai.configure(api_key=api_key)
                 target_model = "gemini-3.6-flash"
                 model = genai.GenerativeModel(target_model)
-                st.caption(f"연결 모델: `{target_model}` | 통합 분석 데이터 풀: PT {len(df_pt_unique):,}건, 대행사매출 {len(df_agency):,}건, 매체사매출 {len(df_tv):,}건, 이슈 {len(df_issues):,}건")
+                st.caption(f"연결 모델: `{target_model}` | 통합 분석 데이터셋: PT {len(df_pt_unique):,}건, 대행사매출 {len(df_agency):,}건, 매체사매출 {len(df_tv):,}건, 이슈 {len(df_issues):,}건")
                 
-                user_question = st.text_input("질문을 입력하세요", placeholder="예: 제일기획의 주요 수주 프로젝트와 전파광고 매출 추이의 특징을 분석해줘")
+                user_question = st.text_input("질문을 입력하세요", placeholder="예: 제일기획이 선정사(결과)로 수주한 모든 광고 목록과 업종별 특징, 빌링 합계를 분석해줘")
                 
                 if st.button("AI 분석 요청", type="primary") and user_question:
-                    with st.spinner("전체 카테고리 데이터베이스를 전수 스캔하여 심층 리포트를 작성 중입니다..."):
-                        # 1. 질문 키워드 정규식 토큰화
-                        tokens = [t.strip() for t in re.split(r'\s+|[?,!.]', user_question) if len(t.strip()) >= 2]
-                        
-                        # 2. PT 데이터 다이내믹 스마트 컨텍스트 구축
-                        target_pt = pd.DataFrame()
-                        if not df_pt_unique.empty:
-                            mask_pt = pd.Series(False, index=df_pt_unique.index)
-                            for tk in tokens:
-                                mask_pt |= (
-                                    df_pt_unique["광고주"].str.contains(tk, case=False, na=False) |
-                                    df_pt_unique["품목"].str.contains(tk, case=False, na=False) |
-                                    df_pt_unique["선정사(결과)"].str.contains(tk, case=False, na=False) |
-                                    df_pt_unique["기존사"].str.contains(tk, case=False, na=False) |
-                                    df_pt_unique["참여사"].str.contains(tk, case=False, na=False) |
-                                    df_pt_unique["메모(비고)"].str.contains(tk, case=False, na=False)
-                                )
-                            matched_pt = df_pt_unique[mask_pt]
-                            other_pt = df_pt_unique[~mask_pt].head(100)
-                            target_pt = pd.concat([matched_pt, other_pt]).drop_duplicates().head(300)
-                        
-                        # 3. 대행사 매출 데이터 스마트 검색
-                        target_agency = pd.DataFrame()
-                        if not df_agency.empty:
-                            mask_ag = pd.Series(False, index=df_agency.index)
-                            for tk in tokens:
-                                mask_ag |= df_agency["대행사"].str.contains(tk, case=False, na=False)
-                            if mask_ag.any():
-                                target_agency = df_agency[mask_ag]
-                            else:
-                                target_agency = df_agency.tail(120)
-                        
-                        # 4. 방송 매체사 매출 데이터 스마트 검색
-                        target_tv = pd.DataFrame()
-                        if not df_tv.empty:
-                            mask_tv = pd.Series(False, index=df_tv.index)
-                            for tk in tokens:
-                                mask_tv |= df_tv["채널"].str.contains(tk, case=False, na=False)
-                            if mask_tv.any():
-                                target_tv = df_tv[mask_tv]
-                            else:
-                                target_tv = df_tv.tail(120)
-
-                        # 5. 월별 업계 이슈 스마트 검색
-                        target_issues = pd.DataFrame()
-                        if not df_issues.empty:
-                            mask_is = pd.Series(False, index=df_issues.index)
-                            for tk in tokens:
-                                mask_is |= (
-                                    df_issues["헤드라인"].str.contains(tk, case=False, na=False) |
-                                    df_issues["상세"].str.contains(tk, case=False, na=False)
-                                )
-                            matched_is = df_issues[mask_is]
-                            other_is = df_issues[~mask_is].head(60)
-                            target_issues = pd.concat([matched_is, other_is]).drop_duplicates().head(120)
-
-                        # 텍스트 포맷 변환
-                        pt_ctx = target_pt[["PT일자", "광고주", "품목", "빌링(억원)", "기존사", "참여사", "선정사(결과)", "메모(비고)"]].to_string(index=False) if not target_pt.empty else "데이터 없음"
-                        ag_ctx = target_agency[["연월", "대행사", "매출(억원)"]].to_string(index=False) if not target_agency.empty else "데이터 없음"
-                        tv_ctx = target_tv[["연월", "구분", "채널", "매출(억원)"]].to_string(index=False) if not target_tv.empty else "데이터 없음"
-                        is_ctx = target_issues[["연월", "헤드라인", "상세"]].to_string(index=False) if not target_issues.empty else "데이터 없음"
+                    with st.spinner("전체 데이터베이스를 전수 스캔하여 심층 리포트를 작성 중입니다..."):
+                        # [핵심] 정규식 필터링 없이 전체 데이터를 CSV 포맷으로 안전하게 100% 전수 전달
+                        pt_full_csv = df_pt_unique[["PT일자", "광고주", "품목", "빌링(억원)", "기존사", "참여사", "선정사(결과)", "메모(비고)"]].to_csv(index=False) if not df_pt_unique.empty else "데이터 없음"
+                        agency_full_csv = df_agency[["연월", "대행사", "매출(억원)"]].to_csv(index=False) if not df_agency.empty else "데이터 없음"
+                        tv_full_csv = df_tv[["연월", "구분", "채널", "매출(억원)"]].to_csv(index=False) if not df_tv.empty else "데이터 없음"
+                        issues_full_csv = df_issues[["연월", "헤드라인", "상세"]].to_string(index=False) if not df_issues.empty else "데이터 없음"
 
                         prompt = f"""
 당신은 대한민국 미디어·방송·광고 업계 전문 수석 전략 컨설턴트입니다.
-아래 제공된 대시보드 전 카테고리 통합 데이터([광고회사 PT 수주 현황], [대행사 전파광고 매출], [방송 매체사 매출], [월별 업계 주요 이슈])를 전방위로 면밀히 분석하여 질문에 전문적이고 명쾌하게 답변해 주세요.
+아래 제공된 [전체 광고회사 PT 수주 현황 데이터]를 비롯한 전 카테고리 빅데이터를 처음부터 끝까지 빠짐없이 전수(Full Dataset) 검토하여 질문에 정확하게 답변해 주세요.
 
-[1. 광고회사 PT 수주 현황 데이터]
-{pt_ctx}
+[1. 전체 광고회사 PT 수주 현황 데이터 (전체 {len(df_pt_unique)}건 누락 없음)]
+{pt_full_csv}
 
-[2. 대행사 전파광고 매출 데이터]
-{ag_ctx}
+[2. 대행사 전파광고 매출 데이터 (전체 {len(df_agency)}건)]
+{agency_full_csv}
 
-[3. 방송 매체사 광고 매출 데이터]
-{tv_ctx}
+[3. 방송 매체사 광고 매출 데이터 (전체 {len(df_tv)}건)]
+{tv_full_csv}
 
 [4. 월별 업계 주요 이슈 브리핑 데이터]
-{is_ctx}
+{issues_full_csv}
 
-[질문]
+[사용자 질문]
 {user_question}
 
 작성 지침:
-1. 반드시 제공된 데이터에 실제로 기록된 사실(일자, 기업명, 품목, 수치, 금액, 수주 결과)을 구체적으로 인용하며 서술하세요.
-2. 특정 대행사나 매체사에 대한 질의인 경우, PT 수주 성과와 매출 추이, 관련 업계 이슈를 입체적으로 교차 검증하여 종합 인사이트를 제시하세요.
-3. 가독성을 위해 불릿 포인트와 핵심 키워드 볼드(**)를 적극 활용하여 보고서 형태로 정돈하세요.
-4. 데이터에 기재되지 않은 내용은 억측하지 말고 사실에 기반하여 답변하세요.
+1. 반드시 제공된 [1. 전체 광고회사 PT 수주 현황 데이터]의 수백 건 행을 전수 스캔하여 질문 대상(예: 특정 대행사가 '선정사(결과)'에 명시된 모든 건)을 단 하나도 누락 없이 전수 집계하세요.
+2. 집계된 프로젝트들의 세부 내역(일자, 광고주, 품목, 빌링, 기존사, 참여사 등)을 명확하게 제시하고, 총 수주 건수 및 합산 빌링 규모를 정확히 계산하여 서술하세요.
+3. 업종/품목별 수주 패턴, 주요 경쟁 구도(누구를 제치고 수주했는지) 등 데이터 기반의 전략적 인사이트를 체계적으로 분석하세요.
+4. 가독성을 위해 항목별 불릿 포인트와 볼드(**)를 적극 활용하여 완성도 높은 리포트 형식으로 작성하세요.
+5. 데이터에 명시된 사실에만 입각하여 서술하세요.
 """
                         response = model.generate_content(prompt)
                         
