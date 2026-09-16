@@ -24,7 +24,7 @@ GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", None)
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "Mickie-Park/media-trend")
 FILE_PATH = "users.json"
 
-# --- 2. 옵션 3 테마 (웜 라이트 펄 #EAE8E3) & 검색/바디 순백색(#FFFFFF) 고정 CSS ---
+# --- 2. 올 화이트(#FFFFFF) 캔버스 + 라디오 원형 체크마크 CSS ---
 st.markdown("""
 <style>
     /* 1. 글로벌 표준 Inter + Pretendard 타이포그래피 */
@@ -38,33 +38,33 @@ st.markdown("""
         font-size: 0.90rem !important;
     }
 
-    /* 옵션 3: 웜 라이트 펄 (#EAE8E3) 전체 캔버스 바탕색 */
+    /* 본문 캔버스 전체 순백색(#FFFFFF) 통일 */
     .stApp {
-        background-color: #EAE8E3 !important;
+        background-color: #FFFFFF !important;
         color: #1E293B !important;
     }
 
-    /* [핵심] 통합검색 박스와 메인 내용 박스는 투명하지 않은 순백색(#FFFFFF)으로 고정 */
+    /* 컨테이너 카드 테두리 및 은은한 그림자 */
     [data-testid="stVerticalBlockBorderWrapper"],
     [data-testid="stVerticalBlockBorderWrapper"] > div {
         background-color: #FFFFFF !important;
-        border-color: #CBD5E1 !important;
+        border-color: #E2E8F0 !important;
         border-radius: 8px !important;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
     }
 
-    /* 메인 본문 최상단 여백 최적화 */
+    /* 최상단 여백 최적화 */
     .block-container {
         padding-top: 1.8rem !important;
         padding-bottom: 3rem !important;
     }
 
-    /* 2. 카테고리 라디오 버튼 (원형 체크마크 및 가로 배열 복원) */
+    /* 2. 카테고리 라디오 버튼 (원형 체크마크 및 가로 배열) */
     div[data-testid="stRadio"] > div[role="radiogroup"] {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: wrap !important;
-        gap: 18px !important;
+        gap: 20px !important;
         padding: 6px 4px 10px 4px !important;
         align-items: center !important;
     }
@@ -81,7 +81,7 @@ st.markdown("""
     }
 
     div[data-testid="stRadio"] > div[role="radiogroup"] > label:hover {
-        background-color: rgba(0, 0, 0, 0.04) !important;
+        background-color: #F8FAFC !important;
     }
 
     div[data-testid="stRadio"] > div[role="radiogroup"] > label div,
@@ -120,7 +120,7 @@ st.markdown("""
         letter-spacing: -0.02em;
     }
 
-    /* 4. 사이드바 UI 가독성 */
+    /* 4. 사이드바 UI (다크 네이비 테마 유지) */
     [data-testid="stSidebar"] {
         background-color: #0C1A30 !important;
         border-right: 1px solid #1E2E4A !important;
@@ -1363,7 +1363,7 @@ with body_container:
                             df_yoy_tv = pd.merge(df_prev_tv, df_curr_tv, on="월", how="outer").fillna(0)
                             
                             def month_sort_key(m):
-                                digits = re.findall(r'\\d+', str(m))
+                                digits = re.findall(r'\d+', str(m))
                                 return int(digits[0]) if digits else 99
                             df_yoy_tv["월순서"] = df_yoy_tv["월"].apply(month_sort_key)
                             df_yoy_tv = df_yoy_tv.sort_values(by="월순서").drop(columns=["월순서"])
