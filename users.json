@@ -33,6 +33,6 @@
         "name": "김준식",
         "password": "37c23345fa0425f0737427f61db3ccc6a0788e03af2e5d49aa4c22dbb0807b86",
         "role": "member",
-        "approved": false
+        "approved": true
     }
 }
