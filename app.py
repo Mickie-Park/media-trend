@@ -43,23 +43,10 @@ st.markdown("""
         color: #1E293B !important;
     }
 
-    /* 1. 상단 고정 붙박이(Sticky) 간판 헤더 */
-    .sticky-main-header {
-        position: -webkit-sticky;
-        position: sticky;
-        top: 0;
-        z-index: 999;
-        background: #FFFFFF;
-        border-bottom: 2px solid #1E3A8A;
-        padding: 12px 24px;
-        margin-left: -2rem;
-        margin-right: -2rem;
-        margin-top: -3.5rem;
-        margin-bottom: 20px;
-        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+    /* 1. 메인 본문 최상단 여백 최적화 (헤더가 좌측 사이드바로 이동함에 따른 최적 핏) */
+    .block-container {
+        padding-top: 1.8rem !important;
+        padding-bottom: 3rem !important;
     }
 
     /* 2. 카테고리 선택 버튼 (ON/OFF 세그먼트) */
@@ -789,6 +776,24 @@ def get_stay_duration_str():
         return f"{minutes}분 {seconds}초"
     return "집계 불가"
 
+# [추천 레이아웃] 사이드바 메인 엠블럼 헤더
+st.sidebar.markdown("""
+<div style="background: linear-gradient(180deg, #13213B 0%, #0F1A2E 100%); border: 1px solid #1E2E4A; border-top: 3px solid #3B82F6; border-radius: 6px; padding: 14px 14px 12px 14px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.2);">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+        <span style="font-size: 0.60rem; font-weight: 700; letter-spacing: 0.08em; color: #F59E0B; background: rgba(245, 158, 11, 0.12); padding: 2px 6px; border-radius: 3px; border: 1px solid rgba(245, 158, 11, 0.25);">STRATEGIC SUITE</span>
+        <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.65rem; color: #10B981; font-weight: 600;">
+            <span style="display: inline-block; width: 5px; height: 5px; background-color: #10B981; border-radius: 50%;"></span>Live
+        </span>
+    </div>
+    <div style="font-size: 1.02rem; font-weight: 800; color: #FFFFFF; line-height: 1.35; letter-spacing: -0.02em; margin-bottom: 4px;">
+        월간 미디어·광고<br>업계 동향 대시보드
+    </div>
+    <div style="font-size: 0.70rem; color: #94A3B8; line-height: 1.35;">
+        2021년 9월 이후 축적 동향 인텔리전스
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
 # 사이드바 사용자 정보 카드
 st.sidebar.markdown(f"""
 <div style="background-color: #13213B; border: 1px solid #243656; border-radius: 5px; padding: 12px; margin-bottom: 12px;">
@@ -1042,25 +1047,9 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
     st.stop()
 
 # =========================================================================
-# 7. [메인 화면] 1. 상단 고정 붙박이(Sticky) 간판 헤더
+# 7. [메인 화면] 메인 캔버스 (헤더는 좌측 사이드바로 이관됨)
 # =========================================================================
-st.markdown("""
-<div class="sticky-main-header">
-    <div>
-        <span style="font-size: 0.70rem; font-weight: 700; letter-spacing: 0.08em; color: #B45309; background: #FEF3C7; padding: 3px 8px; border-radius: 4px; border: 1px solid #FDE68A;">STRATEGIC INTELLIGENCE SUITE</span>
-        <h1 style="font-size: 1.55rem; font-weight: 800; color: #0F172A; margin: 6px 0 2px 0; letter-spacing: -0.025em;">월간 미디어 · 광고 업계 동향 대시보드</h1>
-        <p style="font-size: 0.85rem; color: #64748B; margin: 0;">2021년 9월 이후 축적된 월간 동향 보고서 통합 분석 인텔리전스</p>
-    </div>
-    <div style="display: inline-flex; align-items: center; gap: 7px; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 6px 14px; border-radius: 20px; font-size: 0.76rem; color: #334155; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
-        <span style="display: inline-block; width: 7px; height: 7px; background-color: #10B981; border-radius: 50%;"></span>
-        GitHub 동기화 활성
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-# =========================================================================
-# 7. [메인 화면] 2. 전 카테고리 통합 검색: 완벽한 단일 폐쇄형 박스 컨테이너
-# =========================================================================
+# 전 카테고리 통합 검색: 완벽한 단일 폐쇄형 박스 컨테이너
 search_container = st.container(border=True)
 with search_container:
     st.markdown("""
@@ -1448,7 +1437,6 @@ with body_container:
                 
                 if st.button("AI 분석 요청", type="primary") and user_question:
                     with st.spinner("전체 데이터베이스를 전수 스캔하여 심층 리포트를 작성 중입니다..."):
-                        # [핵심] 정규식 필터링 없이 전체 데이터를 CSV 포맷으로 안전하게 100% 전수 전달
                         pt_full_csv = df_pt_unique[["PT일자", "광고주", "품목", "빌링(억원)", "기존사", "참여사", "선정사(결과)", "메모(비고)"]].to_csv(index=False) if not df_pt_unique.empty else "데이터 없음"
                         agency_full_csv = df_agency[["연월", "대행사", "매출(억원)"]].to_csv(index=False) if not df_agency.empty else "데이터 없음"
                         tv_full_csv = df_tv[["연월", "구분", "채널", "매출(억원)"]].to_csv(index=False) if not df_tv.empty else "데이터 없음"
