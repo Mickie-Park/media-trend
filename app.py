@@ -109,7 +109,7 @@ st.markdown("""
         font-weight: 700 !important;
     }
 
-    /* 3. 검색바 세련된 스카이블루 액센트 테두리 */
+    /* 3. 검색바(통합검색 및 AI 입력창) 세련된 스카이블루 액센트 테두리 */
     .stApp div[data-testid="stTextInput"] input {
         background-color: #FFFFFF !important;
         border: 1.5px solid #93C5FD !important;
@@ -122,6 +122,7 @@ st.markdown("""
         transition: all 0.2s ease !important;
     }
 
+    /* 검색바 포커스 상태: 일렉트릭 블루 글로우 */
     .stApp div[data-testid="stTextInput"] input:focus {
         border: 2px solid #2563EB !important;
         box-shadow: 0 0 0 3.5px rgba(37, 99, 235, 0.15) !important;
@@ -525,6 +526,7 @@ def load_all_data():
         return v
 
     def parse_header_ym(header_str, fallback_ym, fallback_year, fallback_month):
+        # YYYY. M月 형태에서 연도와 월 추출
         m_ym = re.search(r'(\d{4})[.\s]*(\d{1,2})', str(header_str))
         if m_ym:
             y = int(m_ym.group(1))
@@ -751,7 +753,7 @@ def load_all_data():
                                         })
                                 except: pass
 
-            # D. [방송 매체사 매출] 지상파(예상마감=Start / 실제마감=마감) & 종합/유선채널(Start계수=Start / 최종마감=마감, 누적제외)
+            # D. [방송 매체사 매출] 지상파(예상마감=Start / 실제마감=마감) & 종합/유선채널(Start계수=Start / 최종마감=마감, 누적 완벽 제외)
             for i in range(len(df)):
                 row_vals = [str(x).strip() for x in df.iloc[i].dropna().tolist()]
                 row_text = " ".join(row_vals).upper()
@@ -760,70 +762,79 @@ def load_all_data():
                 is_cable = any(k in row_text for k in ["종합/유선채널", "유선채널", "종합편성", "케이블", "CJ ENM", "CJ E&M", "주요 PP"])
 
                 if is_terrestrial or is_cable:
-                    max_offset = 15 if is_terrestrial else 35
+                    max_offset = 18 if is_terrestrial else 40
                     cat_name = "지상파" if is_terrestrial else "종편/유선/PP"
 
-                    header_offset = -1
-                    # 지상파용 컬럼 (예상마감 = Start, 실제마감 = 마감)
-                    terrestrial_expected_col = -1
-                    terrestrial_actual_col = -1
+                    # 1) 헤더 행 결합 탐색: 다단 헤더(Multi-row)를 하나로 병합하여 정확한 컬럼명 구성
+                    header_rows_count = 0
+                    start_header_idx = i + 1
+                    for h_off in range(1, 6):
+                        if i + h_off >= len(df): break
+                        h_chk = "".join([str(c).replace(" ", "").upper() for c in df.iloc[i + h_off].tolist() if pd.notna(c)])
+                        if any(k in h_chk for k in ["마감", "START", "실제", "예상", "구분", "채널"]):
+                            start_header_idx = i + h_off
+                            header_rows_count = 2 # 2개 행에 걸쳐 헤더가 작성된 경우 지원
+                            break
 
-                    # 종합/유선용 컬럼 (Start계수 = Start, 최종마감 = 마감)
-                    cable_start_col = -1
-                    cable_close_col = -1
+                    combined_header_texts = []
+                    num_cols = len(df.columns)
+                    for c_idx in range(num_cols):
+                        parts = []
+                        for h_r in range(start_header_idx, min(len(df), start_header_idx + max(1, header_rows_count))):
+                            val = df.iloc[h_r, c_idx]
+                            if pd.notna(val):
+                                parts.append(str(val).strip())
+                        combined_header_texts.append(" ".join(parts))
+
+                    # 2) 각 열 속성 판별
+                    terrestrial_expected_col = -1 # 지상파 Start
+                    terrestrial_actual_col = -1   # 지상파 마감
+                    cable_start_col = -1          # 종합/유선 Start
+                    cable_close_col = -1          # 종합/유선 마감
                     cable_start_ym_info = (ym, year_str, f"{int(month_str)}월" if month_str.isdigit() else month_str)
                     cable_close_ym_info = (prev_ym, prev_year_str, prev_month_str)
 
-                    for h_off in range(1, 5):
-                        if i + h_off >= len(df): break
-                        h_cells = df.iloc[i + h_off].tolist()
-                        h_str = "".join([str(c).replace(" ", "").replace("\n", "").upper() for c in h_cells if pd.notna(c)])
+                    for c_i, h_str in enumerate(combined_header_texts):
+                        h_clean = h_str.replace(" ", "").replace("\n", "").upper()
                         
-                        if any(k in h_str for k in ["마감", "START", "실제", "예상"]):
-                            header_offset = h_off
-                            for c_i, c_val in enumerate(h_cells):
-                                if pd.isna(c_val): continue
-                                cv = str(c_val).replace(" ", "").replace("\n", "").upper()
-                                
-                                # 누적계수 컬럼은 완전 무시
-                                if any(n_kw in cv for n_kw in ["누적", "누적계수", "누적실적"]):
-                                    continue
+                        if is_terrestrial:
+                            # 지상파: '예상 마감' -> Start, '실제 마감' -> 마감
+                            if "예상마감" in h_clean or ("예상" in h_clean and "마감" in h_clean):
+                                terrestrial_expected_col = c_i
+                            elif "실제마감" in h_clean or ("실제" in h_clean and "마감" in h_clean):
+                                terrestrial_actual_col = c_i
+                            elif "마감" in h_clean and "예상" not in h_clean and terrestrial_actual_col == -1:
+                                terrestrial_actual_col = c_i
+                        else:
+                            # 종합/유선: 누적 컬럼(누적, 누계, ~, 범위)은 영구 배제
+                            if any(bad in h_clean for bad in ["누적", "누계", "~", "전년", "증감"]):
+                                continue
 
-                                if is_terrestrial:
-                                    # 지상파: '예상 마감' -> Start값 / '실제 마감' -> 마감값
-                                    if "예상마감" in cv or ("예상" in cv and "마감" in cv):
-                                        terrestrial_expected_col = c_i
-                                    elif "실제마감" in cv or ("실제" in cv and "마감" in cv):
-                                        terrestrial_actual_col = c_i
-                                    elif "마감" in cv and terrestrial_actual_col == -1:
-                                        terrestrial_actual_col = c_i
-                                else:
-                                    # 종합/유선: Start계수 -> Start값 / 최종마감 -> 마감값
-                                    if "START" in cv:
-                                        cable_start_col = c_i
-                                        cable_start_ym_info = parse_header_ym(c_val, ym, year_str, f"{int(month_str)}월" if month_str.isdigit() else month_str)
-                                    elif ("최종마감" in cv) or ("최종" in cv and "마감" in cv) or ("마감" in cv and "START" not in cv):
-                                        cable_close_col = c_i
-                                        # 최종마감은 익월 파일 내 전월 데이터이므로 fallback은 prev_ym
-                                        cable_close_ym_info = parse_header_ym(c_val, prev_ym, prev_year_str, prev_month_str)
-                            break
+                            # 1. Start계수 열 (해당월)
+                            if "START" in h_clean:
+                                cable_start_col = c_i
+                                cable_start_ym_info = parse_header_ym(h_str, ym, year_str, f"{int(month_str)}월" if month_str.isdigit() else month_str)
 
-                    scan_start = (i + header_offset + 1) if header_offset > 0 else (i + 1)
-                    
-                    for offset in range(scan_start - i, max_offset):
-                        if i + offset >= len(df): break
-                        sub_row = df.iloc[i + offset].tolist()
+                            # 2. 최종마감 열 (익월 파일의 해당월 마감액, 예: 2026. 4月 (최종마감))
+                            elif ("최종마감" in h_clean) or ("최종" in h_clean and "마감" in h_clean) or ("마감" in h_clean and "START" not in h_clean):
+                                cable_close_col = c_i
+                                # 헤더에서 연월 직접 추출 (예: '2026. 4月' -> 2026-04)
+                                cable_close_ym_info = parse_header_ym(h_str, prev_ym, prev_year_str, prev_month_str)
+
+                    # 3) 데이터 행 스캔 및 적재
+                    data_scan_start = start_header_idx + max(1, header_rows_count)
+                    for offset in range(data_scan_start, min(len(df), i + max_offset)):
+                        sub_row = df.iloc[offset].tolist()
                         sub_row_str = " ".join([str(x) for x in sub_row if pd.notna(x)])
                         
                         if any(ign in sub_row_str for ign in ["합계", "소계", "Total", "TOTAL", "단위:", "전년동기", "증감률"]):
                             continue
 
                         matched_ch = None
-                        for item in sub_row:
+                        for item in sub_row[:3]: # 앞쪽 3개 열에서 방송사/채널명 탐색
                             if pd.notna(item):
                                 it_upper = str(item).strip().upper().replace(" ", "")
                                 if not matched_ch:
-                                    # 긴 이름 우선 매칭 (예: KBS-2TV 먼저 매칭 후 KBS)
                                     for k_name in sorted(KNOWN_MEDIA_DICT.keys(), key=len, reverse=True):
                                         k_clean = k_name.upper().replace(" ", "")
                                         if k_clean in it_upper and "TOTAL" not in it_upper and "합계" not in it_upper:
@@ -831,9 +842,8 @@ def load_all_data():
                                             break
                         
                         if matched_ch:
-                            # 1) 지상파: 예상 마감(Start) & 실제 마감(마감) 적재
+                            # A. 지상파 적재 (예상마감=Start / 실제마감=마감)
                             if is_terrestrial:
-                                # Start값: 예상 마감
                                 if terrestrial_expected_col != -1 and terrestrial_expected_col < len(sub_row) and pd.notna(sub_row[terrestrial_expected_col]):
                                     try:
                                         e_val = float(str(sub_row[terrestrial_expected_col]).replace(',', '').strip())
@@ -849,7 +859,6 @@ def load_all_data():
                                             })
                                     except: pass
 
-                                # 마감값: 실제 마감
                                 if terrestrial_actual_col != -1 and terrestrial_actual_col < len(sub_row) and pd.notna(sub_row[terrestrial_actual_col]):
                                     try:
                                         a_val = float(str(sub_row[terrestrial_actual_col]).replace(',', '').strip())
@@ -864,8 +873,8 @@ def load_all_data():
                                                 "채널구분": cat_name
                                             })
                                     except: pass
+                            # B. 종합/유선채널 적재 (Start계수=Start / 최종마감=마감, 누적 절대 제외)
                             else:
-                                # 2) 종합/유선채널: Start계수(Start) & 최종마감(마감) 듀얼 적재
                                 if cable_start_col != -1 and cable_start_col < len(sub_row) and pd.notna(sub_row[cable_start_col]):
                                     try:
                                         s_num = float(str(sub_row[cable_start_col]).replace(',', '').strip())
@@ -1427,7 +1436,7 @@ with body_container:
     # 탭 2: 매출 동향
     elif selected_category == "대행사/매체사 매출 동향":
         st.markdown("<h3 style='font-size: 1.20rem; font-weight: 700; color: #0F172A; margin-bottom: 2px;'>광고대행사 및 방송 매체사 매출 추이 & YoY 분석</h3>", unsafe_allow_html=True)
-        st.caption("대행사 전파광고 및 방송사(지상파 예상/실제마감, 종합·유선 Start/최종마감) 매출 통계입니다. 최신 파일 데이터가 우선 반영됩니다.")
+        st.caption("대행사 전파광고 및 방송사(지상파 예상/실제마감, 종합·유선 Start/최종마감) 매출 통계입니다. 누적계수는 배제되며 최신 파일이 우선 반영됩니다.")
         st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
         
         view_mode = st.radio(
