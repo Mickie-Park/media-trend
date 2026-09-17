@@ -122,7 +122,7 @@ st.markdown("""
         transition: all 0.2s ease !important;
     }
 
-    /* 검색바 포커스(클릭/입력 중) 상태: 일렉트릭 블루 글로우 */
+    /* 검색바 포커스 상태: 일렉트릭 블루 글로우 */
     .stApp div[data-testid="stTextInput"] input:focus {
         border: 2px solid #2563EB !important;
         box-shadow: 0 0 0 3.5px rgba(37, 99, 235, 0.15) !important;
@@ -465,7 +465,7 @@ if auth_token and not st.session_state["logged_in"]:
         st.session_state["login_time"] = get_now_kst()
 
 # --- 3. [최신 파일 우선 정렬 & 원본 구조 기반 파싱 함수] ---
-@st.cache_data
+@st.cache_data(show_spinner=False)
 def load_all_data():
     raw_files = glob.glob("**/*.[xX][lL][sS][xX]", recursive=True)
     all_files = []
@@ -527,11 +527,11 @@ def load_all_data():
         year_str = m.group(1) if m else "기타"
         month_str = m.group(2) if m else "기타"
         
-        # 전월(마감액 대상월) 연월 계산
+        # 전월 연월 계산 (익월 파일에서 전월 마감액 매칭용)
         prev_ym = "기타"
         prev_year_str = "기타"
         prev_month_str = "기타"
-        if ym != "기타":
+        if ym != "기타" and "-" in ym:
             try:
                 cur_y, cur_m = int(year_str), int(month_str)
                 if cur_m == 1:
@@ -650,97 +650,101 @@ def load_all_data():
                             "메모(비고)": memo_val
                         })
 
-            # C. [정밀 타겟팅] 대행사 전파광고 매출: Start계수(해당월) & 전월 마감액(전월) SUM 수치 듀얼 파싱
+            # C. [견고한 전파광고 매출 파서] Start계수(해당월) & 전월 마감액(전월) SUM 행 듀얼 파싱
             for i in range(len(df)):
                 row_str = " ".join([str(x) for x in df.iloc[i].dropna().tolist()])
-                if "광고회사 전파광고" in row_str or "대행사 전파광고" in row_str:
+                row_nospace = row_str.replace(" ", "")
+                if "전파광고" in row_nospace and any(k in row_nospace for k in ["광고회사", "대행사"]):
                     header_offset = -1
                     agency_col = 0
-                    sub_col = 1
                     start_col = -1
                     close_col = -1
 
                     # 헤더 탐색
-                    for h_off in range(1, 5):
+                    for h_off in range(1, 6):
                         if i + h_off >= len(df): break
-                        h_row = [str(x).strip() for x in df.iloc[i + h_off].tolist()]
-                        h_row_str = " ".join(h_row)
-                        if any(k in h_row_str for k in ["Start", "Start계수", "마감액", "전월 마감"]):
+                        h_row = df.iloc[i + h_off].tolist()
+                        h_clean_list = [str(x).replace(" ", "").replace("\n", "").upper() for x in h_row if pd.notna(x)]
+                        h_combined = "".join(h_clean_list)
+                        
+                        if any(k in h_combined for k in ["START", "마감"]):
                             header_offset = h_off
                             for c_i, c_val in enumerate(h_row):
-                                c_clean = c_val.replace(" ", "").upper()
-                                if any(ag_kw in c_clean for ag_kw in ["대행사", "광고회사", "회사명"]):
+                                if pd.isna(c_val): continue
+                                cv = str(c_val).replace(" ", "").replace("\n", "").upper()
+                                if any(ag_kw in cv for ag_kw in ["대행사", "광고회사", "회사명"]):
                                     agency_col = c_i
-                                elif "구분" in c_clean:
-                                    sub_col = c_i
-                                if "START" in c_clean:
+                                if "START" in cv:
                                     start_col = c_i
-                                elif "전월" in c_clean and "마감" in c_clean:
+                                elif ("전월" in cv and "마감" in cv) or ("마감액" in cv) or ("전월마감" in cv):
                                     close_col = c_i
                             break
 
-                    if header_offset > 0:
-                        current_agency_name = ""
-                        for r_off in range(header_offset + 1, 65):
-                            cur_r_idx = i + r_off
-                            if cur_r_idx >= len(df): break
-                            cur_row = df.iloc[cur_r_idx].tolist()
-                            row_full_str = " ".join([str(x).strip() for x in cur_row if pd.notna(x)])
+                    start_scan_r = (i + header_offset + 1) if header_offset > 0 else (i + 2)
+                    current_agency_name = ""
 
-                            if any(stop_kw in row_full_str for stop_kw in ["지상파 매출", "지상파 광고", "종합/유선채널", "유선채널", "방송사 매출"]):
-                                break
+                    for r_idx in range(start_scan_r, min(len(df), start_scan_r + 75)):
+                        cur_row = df.iloc[r_idx].tolist()
+                        row_full_str = "".join([str(x).replace(" ", "") for x in cur_row if pd.notna(x)])
 
-                            ag_cell = str(cur_row[agency_col]).strip() if agency_col < len(cur_row) and pd.notna(cur_row[agency_col]) else ""
-                            sub_cell = str(cur_row[sub_col]).strip() if sub_col < len(cur_row) and pd.notna(cur_row[sub_col]) else ""
+                        if any(stop_kw in row_full_str for stop_kw in ["지상파매출", "지상파광고", "종합/유선채널", "유선채널", "방송사매출"]):
+                            break
 
-                            # 대행사명 갱신 (합계/SUM은 제외)
-                            if ag_cell and ag_cell.lower() not in ["nan", "none", "-"]:
-                                if not any(ign in ag_cell for ign in ["합계", "Total", "TOTAL", "SUM", "소계", "총계", "단위", "순위"]):
-                                    current_agency_name = ag_cell
-                                else:
-                                    current_agency_name = ""
+                        # 대행사명 후보 탐색 (매체 구분 단어 및 합계/SUM 제외)
+                        for cand_c in range(min(3, len(cur_row))):
+                            val = cur_row[cand_c]
+                            if pd.notna(val):
+                                v_str = str(val).strip()
+                                v_upper = v_str.upper().replace(" ", "")
+                                if v_str and not re.match(r'^\d+(\.\d+)?$', v_str):
+                                    if not any(ign in v_upper for ign in ["대행사", "광고회사", "회사명", "구분", "순위", "합계", "TOTAL", "소계", "SUM", "전파광고", "매출", "단위"]):
+                                        if not any(b_name in v_upper for b_name in ["KBS", "MBC", "SBS", "JTBC", "TV조선", "채널A", "MBN", "CJENM", "SPOTV"]):
+                                            if not any(sub in v_upper for sub in ["지상파", "케이블", "종편", "유선", "PP", "라디오", "TV", "디지털", "매체"]):
+                                                current_agency_name = v_str
+                                                break
+                                    elif any(ign in v_upper for ign in ["합계", "TOTAL", "전체합계"]):
+                                        current_agency_name = ""
 
-                            # SUM 행인지 여부 판별
-                            is_sum_row = False
-                            if "SUM" in sub_cell.upper() or "소계" in sub_cell or "합계" in sub_cell:
-                                is_sum_row = True
-                            elif "SUM" in ag_cell.upper() and current_agency_name:
-                                is_sum_row = True
+                        # SUM 행 판별 (행 전체에서 SUM, 소계 탐색)
+                        is_sum_row = False
+                        for cell in cur_row:
+                            if pd.notna(cell):
+                                cu = str(cell).strip().upper()
+                                if cu in ["SUM", "소계"]:
+                                    is_sum_row = True
+                                    break
 
-                            # 대행사별 SUM 행 데이터 적재
-                            if current_agency_name and is_sum_row:
-                                # 1) 당월 Start계수 수치 (해당월 ym의 Start 데이터)
-                                if start_col >= 0 and start_col < len(cur_row) and pd.notna(cur_row[start_col]):
-                                    try:
-                                        s_num = float(str(cur_row[start_col]).replace(',', '').strip())
-                                        if s_num > 0:
-                                            agency_sales_list.append({
-                                                "연월": ym,
-                                                "연도": year_str,
-                                                "월": f"{int(month_str)}월" if month_str.isdigit() else month_str,
-                                                "대행사": current_agency_name,
-                                                "매출(억원)": s_num,
-                                                "구분": "Start"
-                                            })
-                                    except:
-                                        pass
+                        # Start계수 및 전월 마감액 수치 추출
+                        if current_agency_name and is_sum_row:
+                            # 1) 당월 Start계수 수치
+                            if start_col != -1 and start_col < len(cur_row) and pd.notna(cur_row[start_col]):
+                                try:
+                                    s_num = float(str(cur_row[start_col]).replace(',', '').strip())
+                                    if s_num > 0:
+                                        agency_sales_list.append({
+                                            "연월": ym,
+                                            "연도": year_str,
+                                            "월": f"{int(month_str)}월" if month_str.isdigit() else month_str,
+                                            "대행사": current_agency_name,
+                                            "매출(억원)": s_num,
+                                            "구분": "Start"
+                                        })
+                                except: pass
 
-                                # 2) 전월 마감액 수치 (전월 prev_ym의 마감 데이터)
-                                if close_col >= 0 and close_col < len(cur_row) and pd.notna(cur_row[close_col]):
-                                    try:
-                                        c_num = float(str(cur_row[close_col]).replace(',', '').strip())
-                                        if c_num > 0 and prev_ym != "기타":
-                                            agency_sales_list.append({
-                                                "연월": prev_ym,
-                                                "연도": prev_year_str,
-                                                "월": prev_month_str,
-                                                "대행사": current_agency_name,
-                                                "매출(억원)": c_num,
-                                                "구분": "마감"
-                                            })
-                                    except:
-                                        pass
-                    break
+                            # 2) 전월 마감액 수치
+                            if close_col != -1 and close_col < len(cur_row) and pd.notna(cur_row[close_col]):
+                                try:
+                                    c_num = float(str(cur_row[close_col]).replace(',', '').strip())
+                                    if c_num > 0 and prev_ym != "기타":
+                                        agency_sales_list.append({
+                                            "연월": prev_ym,
+                                            "연도": prev_year_str,
+                                            "월": prev_month_str,
+                                            "대행사": current_agency_name,
+                                            "매출(억원)": c_num,
+                                            "구분": "마감"
+                                        })
+                                except: pass
 
             # D. 방송/미디어 매체사 매출
             for i in range(len(df)):
@@ -804,7 +808,6 @@ def load_all_data():
             
     df_ag_raw = pd.DataFrame(agency_sales_list)
     if not df_ag_raw.empty:
-        # 중복 적재 방지 (동일 연월, 대행사, 구분에 대해 가장 최신 파일 데이터 보존)
         df_ag_raw = df_ag_raw.drop_duplicates(subset=["연월", "대행사", "구분"], keep="first")
 
     return pd.DataFrame(issues_list), pd.DataFrame(tv_sales_list), pd.DataFrame(pt_list), df_ag_raw, all_files
@@ -1359,7 +1362,6 @@ with body_container:
                     df_view_ag = df_single_ag.sort_values(by="연월")
 
                 if view_mode in ["그래프 보기", "둘 다 보기"]:
-                    # Start vs 마감 2개 막대 (Grouped Bar)
                     fig_ag = px.bar(
                         df_view_ag, 
                         x="연월", 
@@ -1381,7 +1383,6 @@ with body_container:
                     st.plotly_chart(fig_ag, use_container_width=True)
 
                 if view_mode in ["상세 매출표 보기", "둘 다 보기"]:
-                    # Start / 마감 듀얼 피벗 테이블
                     pivot_ag = df_view_ag.pivot_table(
                         index=["대행사", "구분"], 
                         columns="연월", 
@@ -1392,7 +1393,6 @@ with body_container:
                     st.dataframe(pivot_ag, use_container_width=True)
 
                 with st.expander(f"{selected_single_agency} YoY 비교 분석 (마감액 기준)", expanded=False):
-                    # YoY 분석은 확정치인 '마감' 데이터 우선 기준
                     df_ag_close = df_single_ag[df_single_ag["구분"] == "마감"]
                     if df_ag_close.empty:
                         df_ag_close = df_single_ag
