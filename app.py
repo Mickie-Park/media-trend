@@ -291,7 +291,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 축구공 ⚽ 및 특수기호가 섞인 셀에서 순수 양의 실수(float)만 정밀 추출하는 함수
+# 축구공 ⚽ (U+26BD) 및 특수기호가 섞인 셀에서 순수 양의 실수(float)만 정밀 추출하는 함수
 def extract_clean_number(val):
     if val is None or pd.isna(val):
         return None
@@ -300,7 +300,6 @@ def extract_clean_number(val):
     val_str = str(val).strip()
     if not val_str or val_str.lower() in ["nan", "none", "-"]:
         return None
-    # 콤마 제거 및 숫자/소수점 이외의 모든 문자(이모지, 축구공 ⚽ 등) 제거
     cleaned = re.sub(r'[^\d.]', '', val_str.replace(',', ''))
     if cleaned:
         try:
@@ -567,6 +566,7 @@ def load_all_data():
                 pass
         
         cur_m_int = int(month_str) if month_str.isdigit() else -1
+        prev_m_int = int(prev_month_str.replace("월", "")) if prev_month_str.replace("월", "").isdigit() else -1
 
         try:
             xls = pd.ExcelFile(f)
@@ -760,7 +760,7 @@ def load_all_data():
                                         "구분": "마감"
                                     })
 
-            # D. [방송 매체사 매출 - 누적계수 원천 차단 및 단월 마감 정밀 파싱]
+            # D. [방송 매체사 매출 - 지상파 & 종합/유선 정밀 파이프라인]
             for i in range(len(df)):
                 row_vals = [str(x).strip() for x in df.iloc[i].dropna().tolist()]
                 row_text = " ".join(row_vals).upper()
@@ -780,7 +780,6 @@ def load_all_data():
                             start_header_idx = i + h_off
                             break
 
-                    # [핵심] 상하 3개 행을 열 단위로 수직 결합하여 온전한 헤더 텍스트 복원
                     header_combined_cols = []
                     for c_idx in range(len(df.columns)):
                         text_parts = []
@@ -790,54 +789,62 @@ def load_all_data():
                                 text_parts.append(str(val).strip())
                         header_combined_cols.append(" ".join(text_parts))
 
-                    terrestrial_actual_col = -1 # 지상파 실제마감
-                    cable_start_col = -1        # 종합/유선 Start
-                    cable_close_col = -1        # 종합/유선 최종마감
-                    cable_close_target_ym = None
+                    # 인덱스 초기화
+                    t_start_col = -1 # 지상파 Start ('예상 마감', 대상월: ym)
+                    t_close_col = -1 # 지상파 마감 ('실제 마감', 대상월: prev_ym)
+                    c_start_col = -1 # 종합/유선 Start ('Start계수', 대상월: ym)
+                    c_close_col = -1 # 종합/유선 마감 ('최종마감', 대상월: prev_ym)
 
                     for c_i, h_full in enumerate(header_combined_cols):
                         h_clean = re.sub(r'[\s\n\r]', '', h_full).upper()
 
-                        # [철칙] 누적, 누계, 물결표(~), 범위(-), 전년, 증감 단어는 영구 배제
-                        # 단, 'START계수'는 Start 열이므로 허용하되, '누적' 단어가 1글자라도 있으면 즉시 탈락
-                        if any(bad in h_clean for bad in ["누적", "누계", "~", "전년", "증감"]):
+                        # 누적, 누계, 물결표(~, ～, 〜), 하이픈 범위(-), 전년, 증감 단어 완전 배제
+                        if any(bad in h_clean for bad in ["누적", "누계", "~", "～", "〜", "전년", "증감"]):
                             continue
-                        if re.search(r'\d+[~\-]\d+', h_full):
+                        if re.search(r'\d+[~\-～〜]\d+', h_full):
+                            continue
+                        if re.search(r'[~\-～〜]\d+', h_full):
                             continue
                         if "계수" in h_clean and "START" not in h_clean:
                             continue
 
-                        # 1. 지상파: 파일 연도(year_str)와 당월(cur_m_int)의 '실제 마감' 단독 열만 선택
+                        # 1. 지상파
                         if is_terrestrial:
-                            if "실제" in h_clean and "마감" in h_clean and "예상" not in h_clean:
+                            # Start: '예상' (당월 ym의 Start)
+                            if "예상" in h_clean and t_start_col == -1:
                                 m_h = re.search(r'(\d{4})[.\s]*(\d{1,2})', h_full)
                                 if m_h:
-                                    if m_h.group(1) == year_str and int(m_h.group(2)) == cur_m_int:
-                                        terrestrial_actual_col = c_i
-                                elif terrestrial_actual_col == -1:
-                                    terrestrial_actual_col = c_i
+                                    if m_h.group(1) == year_str and (int(m_h.group(2)) == cur_m_int or cur_m_int == -1):
+                                        t_start_col = c_i
+                                else:
+                                    t_start_col = c_i
+
+                            # 마감: '실제' (전월 prev_ym의 마감, 예: 6월 실제 마감)
+                            # 증감액/차액 열 오인식 방지
+                            elif "실제" in h_clean and "마감" in h_clean and t_close_col == -1:
+                                m_h = re.search(r'(\d{4})[.\s]*(\d{1,2})', h_full)
+                                if m_h:
+                                    if m_h.group(1) == prev_year_str and (int(m_h.group(2)) == prev_m_int or prev_m_int == -1):
+                                        t_close_col = c_i
+                                else:
+                                    t_close_col = c_i
 
                         # 2. 종합/유선채널
                         else:
-                            # A) Start 열: START가 있고 마감이 없는 열
-                            if "START" in h_clean and "마감" not in h_clean:
-                                if cable_start_col == -1:
-                                    cable_start_col = c_i
+                            # Start: 'START' (당월 ym의 Start)
+                            if "START" in h_clean and c_start_col == -1:
+                                c_start_col = c_i
 
-                            # B) 마감 열: '최종마감' 또는 '마감'이 있고 START/예상이 없는 열
-                            elif ("최종마감" in h_clean) or ("최종" in h_clean and "마감" in h_clean) or (h_clean.endswith("마감") and "START" not in h_clean and "예상" not in h_clean):
+                            # 마감: '최종마감' (단월 마감, 전월 prev_ym의 마감)
+                            elif ("최종마감" in h_clean or ("최종" in h_clean and "마감" in h_clean)) and c_close_col == -1:
                                 m_h = re.search(r'(\d{4})[.\s]*(\d{1,2})', h_full)
                                 if m_h:
                                     t_y = m_h.group(1)
                                     t_m = int(m_h.group(2))
-                                    # [핵심] 마감열은 반드시 당월 이전(과거 월) 실적이어야 함! (7월 파일에서 7월 마감 추출 원천 차단)
-                                    if t_y < year_str or (t_y == year_str and t_m < cur_m_int):
-                                        if cable_close_col == -1:
-                                            cable_close_col = c_i
-                                            cable_close_target_ym = (f"{int(t_y):04d}-{t_m:02d}", t_y, f"{t_m}월")
-                                elif prev_ym != "기타" and cable_close_col == -1:
-                                    cable_close_col = c_i
-                                    cable_close_target_ym = (prev_ym, prev_year_str, prev_month_str)
+                                    if t_y == prev_year_str and (t_m == prev_m_int or prev_m_int == -1):
+                                        c_close_col = c_i
+                                else:
+                                    c_close_col = c_i
 
                     # 데이터 행 스캔 및 적재
                     data_start_r = start_header_idx + 2
@@ -860,26 +867,41 @@ def load_all_data():
                                             break
 
                         if matched_ch:
-                            # 1) 지상파 적재: '실제 마감' 단독 적재 (축구공 ⚽ 아이콘 정제 적용)
+                            # 1) 지상파 적재 (Start: 당월 예상마감 / 마감: 익월 파일 내 실제마감)
                             if is_terrestrial:
-                                if terrestrial_actual_col != -1 and terrestrial_actual_col < len(sub_row):
-                                    a_val = extract_clean_number(sub_row[terrestrial_actual_col])
-                                    if a_val is not None and a_val > 0:
+                                # Start 적재
+                                if t_start_col != -1 and t_start_col < len(sub_row):
+                                    s_val = extract_clean_number(sub_row[t_start_col])
+                                    if s_val is not None and s_val > 0:
                                         tv_sales_list.append({
                                             "연월": ym,
                                             "연도": year_str,
                                             "월": f"{int(month_str)}월" if month_str.isdigit() else month_str,
                                             "채널": matched_ch,
-                                            "매출(억원)": a_val,
+                                            "매출(억원)": s_val,
+                                            "구분": "Start",
+                                            "채널구분": cat_name
+                                        })
+
+                                # 마감 적재 (전월 prev_ym의 마감값으로 적재)
+                                if t_close_col != -1 and t_close_col < len(sub_row):
+                                    c_val = extract_clean_number(sub_row[t_close_col])
+                                    if c_val is not None and c_val > 0 and prev_ym != "기타":
+                                        tv_sales_list.append({
+                                            "연월": prev_ym,
+                                            "연도": prev_year_str,
+                                            "월": prev_month_str,
+                                            "채널": matched_ch,
+                                            "매출(억원)": c_val,
                                             "구분": "마감",
                                             "채널구분": cat_name
                                         })
 
-                            # 2) 종합/유선 적재: 당월 Start(ym) & 전월 마감(과거 월)만 적재 (축구공 ⚽ 아이콘 정제 적용)
-                            # 7월 마감값은 추출되지 않으므로 7월 마감은 100% 공란으로 보장됨!
+                            # 2) 종합/유선채널 적재 (Start: 당월 Start계수 / 마감: 익월 파일 내 최종마감)
                             else:
-                                if cable_start_col != -1 and cable_start_col < len(sub_row):
-                                    s_num = extract_clean_number(sub_row[cable_start_col])
+                                # Start 적재
+                                if c_start_col != -1 and c_start_col < len(sub_row):
+                                    s_num = extract_clean_number(sub_row[c_start_col])
                                     if s_num is not None and s_num > 0:
                                         tv_sales_list.append({
                                             "연월": ym,
@@ -891,13 +913,14 @@ def load_all_data():
                                             "채널구분": cat_name
                                         })
 
-                                if cable_close_col != -1 and cable_close_col < len(sub_row):
-                                    c_num = extract_clean_number(sub_row[cable_close_col])
-                                    if c_num is not None and c_num > 0 and cable_close_target_ym:
+                                # 마감 적재 (전월 prev_ym의 마감값으로 적재, 누적계수 원천 차단)
+                                if c_close_col != -1 and c_close_col < len(sub_row):
+                                    c_num = extract_clean_number(sub_row[c_close_col])
+                                    if c_num is not None and c_num > 0 and prev_ym != "기타":
                                         tv_sales_list.append({
-                                            "연월": cable_close_target_ym[0],
-                                            "연도": cable_close_target_ym[1],
-                                            "월": cable_close_target_ym[2],
+                                            "연월": prev_ym,
+                                            "연도": prev_year_str,
+                                            "월": prev_month_str,
                                             "채널": matched_ch,
                                             "매출(억원)": c_num,
                                             "구분": "마감",
@@ -1432,7 +1455,7 @@ with body_container:
     # 탭 2: 매출 동향
     elif selected_category == "대행사/매체사 매출 동향":
         st.markdown("<h3 style='font-size: 1.20rem; font-weight: 700; color: #0F172A; margin-bottom: 2px;'>광고대행사 및 방송 매체사 매출 추이 & YoY 분석</h3>", unsafe_allow_html=True)
-        st.caption("대행사 전파광고 및 방송사 매출 통계(지상파 실제마감 / 종합·유선 Start vs 마감)입니다. 누적계수는 완전 배제되며, 최신월의 마감값은 익월 파일 등록 시 업데이트됩니다.")
+        st.caption("대행사 전파광고 및 방송사 매출 통계(Start vs 마감)입니다. 누적계수는 완전 배제되며, 최신월의 마감값은 익월 파일 등록 시 업데이트됩니다.")
         st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
         
         view_mode = st.radio(
@@ -1547,7 +1570,7 @@ with body_container:
             else:
                 st.info("대행사 전파광고 매출 데이터를 집계 중입니다.")
 
-        # [우측] 방송 매체사 영역 (지상파 단독 마감 vs 종합/유선 Start/마감 듀얼 막대)
+        # [우측] 방송 매체사 영역 (지상파/종합유선 Start vs 마감 듀얼 막대그래프)
         with col_r:
             st.markdown("##### 방송 매체사 광고 매출 (Start vs 마감)")
             if not df_tv.empty:
@@ -1701,7 +1724,7 @@ with body_container:
 [2. 대행사 전파광고 매출 데이터 (전체 {len(df_agency)}건, Start/마감 구분 포함)]
 {agency_full_csv}
 
-[3. 방송 매체사 광고 매출 데이터 (전체 {len(df_tv)}건, 지상파 실제마감 / 종합유선 Start·마감 포함)]
+[3. 방송 매체사 광고 매출 데이터 (전체 {len(df_tv)}건, Start/마감 구분 포함)]
 {tv_full_csv}
 
 [4. 월별 업계 주요 이슈 브리핑 데이터]
