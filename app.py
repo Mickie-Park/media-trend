@@ -17,6 +17,7 @@ st.set_page_config(page_title="월간 업계 동향 통합 인텔리전스", lay
 DATA_DIR = "./data"
 USER_DB_FILE = "users.json"
 LOG_DB_FILE = "activity_logs.json"
+MASTER_SALES_FILE = "sales_master.xlsx"
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # GitHub API 연동 설정 (media-trend)
@@ -24,10 +25,9 @@ GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", None)
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "Mickie-Park/media-trend")
 FILE_PATH = "users.json"
 
-# --- 2. CSS 스타일링 (올 화이트 캔버스 + 캡슐 버튼 내 라디오 마크 결합 + 스카이블루 검색바 테두리) ---
+# --- 2. CSS 스타일링 (올 화이트 캔버스 + 캡슐 버튼 + 스카이블루 검색바 테두리) ---
 st.markdown("""
 <style>
-    /* 1. 글로벌 표준 Inter + Pretendard 타이포그래피 */
     @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
     @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
     
@@ -38,13 +38,11 @@ st.markdown("""
         font-size: 0.90rem !important;
     }
 
-    /* 본문 캔버스 전체 순백색(#FFFFFF) 통일 */
     .stApp {
         background-color: #FFFFFF !important;
         color: #1E293B !important;
     }
 
-    /* 컨테이너 카드 테두리 및 은은한 그림자 */
     [data-testid="stVerticalBlockBorderWrapper"],
     [data-testid="stVerticalBlockBorderWrapper"] > div {
         background-color: #FFFFFF !important;
@@ -53,13 +51,11 @@ st.markdown("""
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
     }
 
-    /* 최상단 여백 최적화 */
     .block-container {
         padding-top: 1.8rem !important;
         padding-bottom: 3rem !important;
     }
 
-    /* 2. [캡슐 버튼 + 라디오 원형 체크마크 결합] */
     div[data-testid="stRadio"] > div[role="radiogroup"] {
         display: flex !important;
         flex-direction: row !important;
@@ -69,7 +65,6 @@ st.markdown("""
         align-items: center !important;
     }
 
-    /* 캡슐 알약 형태의 외곽 박스 (OFF 상태) */
     div[data-testid="stRadio"] div[role="radiogroup"] label {
         display: inline-flex !important;
         align-items: center !important;
@@ -84,7 +79,6 @@ st.markdown("""
         transition: all 0.18s ease-in-out !important;
     }
 
-    /* OFF 캡슐 호버 효과 */
     div[data-testid="stRadio"] div[role="radiogroup"] label:hover {
         background-color: #F1F5F9 !important;
         border-color: #94A3B8 !important;
@@ -97,7 +91,6 @@ st.markdown("""
         margin: 0 !important;
     }
 
-    /* 선택된 캡슐 (ON 상태): 블루 틴트 배경 + 다크 네이비 테두리 */
     div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) {
         background-color: #EFF6FF !important;
         border: 1.5px solid #1E3A8A !important;
@@ -109,7 +102,6 @@ st.markdown("""
         font-weight: 700 !important;
     }
 
-    /* 3. 검색바 세련된 스카이블루 액센트 테두리 */
     .stApp div[data-testid="stTextInput"] input {
         background-color: #FFFFFF !important;
         border: 1.5px solid #93C5FD !important;
@@ -128,7 +120,6 @@ st.markdown("""
         outline: none !important;
     }
 
-    /* 4. AI 동향 분석가 답변 마크다운 폰트 스케일 다운 */
     .ai-report-box h1 {
         font-size: 1.25rem !important;
         font-weight: 800 !important;
@@ -162,7 +153,6 @@ st.markdown("""
         font-weight: 700 !important;
     }
 
-    /* 5. 지표(Metric) 카드 */
     [data-testid="stMetric"] {
         background-color: #F8FAFC !important;
         padding: 14px 18px !important;
@@ -185,7 +175,6 @@ st.markdown("""
         letter-spacing: -0.02em;
     }
 
-    /* 6. 사이드바 UI (다크 네이비 테마 유지) */
     [data-testid="stSidebar"] {
         background-color: #0C1A30 !important;
         border-right: 1px solid #1E2E4A !important;
@@ -233,7 +222,6 @@ st.markdown("""
         border-color: #60A5FA !important;
     }
 
-    /* 엑셀 파일 업로더 */
     [data-testid="stSidebar"] [data-testid="stFileUploader"] {
         background-color: transparent !important;
     }
@@ -290,24 +278,6 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-
-# 축구공 ⚽ (U+26BD) 및 특수기호가 섞인 셀에서 순수 양의 실수(float)만 정밀 추출하는 함수
-def extract_clean_number(val):
-    if val is None or pd.isna(val):
-        return None
-    if isinstance(val, (int, float)):
-        return float(val) if val > 0 else 0.0
-    val_str = str(val).strip()
-    if not val_str or val_str.lower() in ["nan", "none", "-"]:
-        return None
-    cleaned = re.sub(r'[^\d.]', '', val_str.replace(',', ''))
-    if cleaned:
-        try:
-            num = float(cleaned)
-            return num if num > 0 else 0.0
-        except:
-            return None
-    return None
 
 def get_github_headers():
     return {
@@ -481,60 +451,26 @@ if auth_token and not st.session_state["logged_in"]:
         st.session_state["user_name"] = users_current[auth_token].get("name", auth_token)
         st.session_state["login_time"] = get_now_kst()
 
-# --- 3. [최신 파일 우선 정렬 & 원본 구조 기반 파싱 함수] ---
+# --- 3. [데이터 로드: sales_master.xlsx 기반 단일 진실 공급원 체계] ---
 @st.cache_data(show_spinner=False)
 def load_all_data():
     raw_files = glob.glob("**/*.[xX][lL][sS][xX]", recursive=True)
-    all_files = []
+    monthly_report_files = []
     for f in raw_files:
         filename = os.path.basename(f)
-        if filename.startswith("~$"):
+        if filename.startswith("~$") or "sales_master" in filename:
             continue
         if "업계동향" in filename or "data" in f.lower():
-            all_files.append(f)
+            monthly_report_files.append(f)
             
-    # 최신 파일 우선 정렬 (내림차순)
     def get_file_ym_score(filepath):
         m = re.search(r'(\d{4})(\d{2})', filepath)
         return int(m.group(1) + m.group(2)) if m else 0
         
-    all_files = sorted(list(set(all_files)), key=get_file_ym_score, reverse=True)
+    monthly_report_files = sorted(list(set(monthly_report_files)), key=get_file_ym_score, reverse=True)
     
     issues_list = []
-    tv_sales_list = []
     pt_list = []
-    agency_sales_list = []
-    
-    KNOWN_MEDIA_DICT = {
-        "KBS-2TV": "KBS",
-        "KBS2TV": "KBS",
-        "KBS 2TV": "KBS",
-        "KBS": "KBS",
-        "MBC": "MBC",
-        "SBS": "SBS",
-        "CJ ENM": "CJ ENM",
-        "CJ E&M": "CJ ENM",
-        "CJENM": "CJ ENM",
-        "CJE&M": "CJ ENM",
-        "JTBC": "JTBC",
-        "TV CHOSUN": "TV조선",
-        "TV조선": "TV조선",
-        "CHANNEL A": "채널A",
-        "채널A": "채널A",
-        "CHANNELA": "채널A",
-        "MBN": "MBN",
-        "YTN": "YTN",
-        "연합뉴스": "연합뉴스TV",
-        "연합뉴스TV": "연합뉴스TV",
-        "SPOTV": "SPOTV",
-        "SBS PLUS": "SBS Plus",
-        "SBS FUNT": "SBS FunE",
-        "KBS N": "KBS N",
-        "MBC PLUS": "MBC Plus",
-        "E채널": "E채널",
-        "TVN": "tvN",
-        "OCN": "OCN"
-    }
 
     def clean_str(val):
         if pd.isna(val): return ""
@@ -542,32 +478,12 @@ def load_all_data():
         if v.lower() in ["nan", "none", "-"]: return ""
         return v
 
-    for f in all_files:
+    # 1. 54개 원본 파일에서 [주요 Issue 요약] 및 [광고회사 PT 현황] 파싱 (기존 안정 로직 유지)
+    for f in monthly_report_files:
         m = re.search(r'(\d{4})(\d{2})', f)
         ym = f"{m.group(1)}-{m.group(2)}" if m else "기타"
         year_str = m.group(1) if m else "기타"
-        month_str = m.group(2) if m else "기타"
         
-        # 전월 연월 계산 (익월 파일에서 전월 마감액 매칭용)
-        prev_ym = "기타"
-        prev_year_str = "기타"
-        prev_month_str = "기타"
-        if ym != "기타" and "-" in ym:
-            try:
-                cur_y, cur_m = int(year_str), int(month_str)
-                if cur_m == 1:
-                    prev_y, prev_m = cur_y - 1, 12
-                else:
-                    prev_y, prev_m = cur_y, cur_m - 1
-                prev_ym = f"{prev_y:04d}-{prev_m:02d}"
-                prev_year_str = str(prev_y)
-                prev_month_str = f"{prev_m}월"
-            except:
-                pass
-        
-        cur_m_int = int(month_str) if month_str.isdigit() else -1
-        prev_m_int = int(prev_month_str.replace("월", "")) if prev_month_str.replace("월", "").isdigit() else -1
-
         try:
             xls = pd.ExcelFile(f)
             df = pd.read_excel(f, sheet_name=xls.sheet_names[0])
@@ -673,271 +589,68 @@ def load_all_data():
                             "선정사(결과)": winner_val,
                             "메모(비고)": memo_val
                         })
-
-            # C. [대행사 전파광고 매출] 당월 Start계수(해당월 Start) & 전월 마감액(전월 마감) SUM 행 듀얼 파싱
-            for i in range(len(df)):
-                row_str = " ".join([str(x) for x in df.iloc[i].dropna().tolist()])
-                row_nospace = row_str.replace(" ", "")
-                if "전파광고" in row_nospace and any(k in row_nospace for k in ["광고회사", "대행사"]):
-                    header_offset = -1
-                    agency_col = 0
-                    start_col = -1
-                    close_col = -1
-
-                    for h_off in range(1, 6):
-                        if i + h_off >= len(df): break
-                        h_row = df.iloc[i + h_off].tolist()
-                        h_clean_list = [str(x).replace(" ", "").replace("\n", "").upper() for x in h_row if pd.notna(x)]
-                        h_combined = "".join(h_clean_list)
-                        
-                        if any(k in h_combined for k in ["START", "마감"]):
-                            header_offset = h_off
-                            for c_i, c_val in enumerate(h_row):
-                                if pd.isna(c_val): continue
-                                cv = str(c_val).replace(" ", "").replace("\n", "").upper()
-                                if any(ag_kw in cv for ag_kw in ["대행사", "광고회사", "회사명"]):
-                                    agency_col = c_i
-                                if "START" in cv:
-                                    start_col = c_i
-                                elif ("전월" in cv and "마감" in cv) or ("마감액" in cv) or ("전월마감" in cv):
-                                    close_col = c_i
-                            break
-
-                    start_scan_r = (i + header_offset + 1) if header_offset > 0 else (i + 2)
-                    current_agency_name = ""
-
-                    for r_idx in range(start_scan_r, min(len(df), start_scan_r + 75)):
-                        cur_row = df.iloc[r_idx].tolist()
-                        row_full_str = "".join([str(x).replace(" ", "") for x in cur_row if pd.notna(x)])
-
-                        if any(stop_kw in row_full_str for stop_kw in ["지상파매출", "지상파광고", "종합/유선채널", "유선채널", "방송사매출"]):
-                            break
-
-                        for cand_c in range(min(3, len(cur_row))):
-                            val = cur_row[cand_c]
-                            if pd.notna(val):
-                                v_str = str(val).strip()
-                                v_upper = v_str.upper().replace(" ", "")
-                                if v_str and not re.match(r'^\d+(\.\d+)?$', v_str):
-                                    if not any(ign in v_upper for ign in ["대행사", "광고회사", "회사명", "구분", "순위", "합계", "TOTAL", "소계", "SUM", "전파광고", "매출", "단위"]):
-                                        if not any(b_name in v_upper for b_name in ["KBS", "MBC", "SBS", "JTBC", "TV조선", "채널A", "MBN", "CJENM", "SPOTV"]):
-                                            if not any(sub in v_upper for sub in ["지상파", "케이블", "종편", "유선", "PP", "라디오", "TV", "디지털", "매체"]):
-                                                current_agency_name = v_str
-                                                break
-                                    elif any(ign in v_upper for ign in ["합계", "TOTAL", "전체합계"]):
-                                        current_agency_name = ""
-
-                        is_sum_row = False
-                        for cell in cur_row:
-                            if pd.notna(cell):
-                                cu = str(cell).strip().upper()
-                                if cu in ["SUM", "소계"]:
-                                    is_sum_row = True
-                                    break
-
-                        if current_agency_name and is_sum_row:
-                            if start_col != -1 and start_col < len(cur_row):
-                                s_num = extract_clean_number(cur_row[start_col])
-                                if s_num is not None and s_num > 0:
-                                    agency_sales_list.append({
-                                        "연월": ym,
-                                        "연도": year_str,
-                                        "월": f"{int(month_str)}월" if month_str.isdigit() else month_str,
-                                        "대행사": current_agency_name,
-                                        "매출(억원)": s_num,
-                                        "구분": "Start"
-                                    })
-
-                            if close_col != -1 and close_col < len(cur_row):
-                                c_num = extract_clean_number(cur_row[close_col])
-                                if c_num is not None and c_num > 0 and prev_ym != "기타":
-                                    agency_sales_list.append({
-                                        "연월": prev_ym,
-                                        "연도": prev_year_str,
-                                        "월": prev_month_str,
-                                        "대행사": current_agency_name,
-                                        "매출(억원)": c_num,
-                                        "구분": "마감"
-                                    })
-
-            # D. [방송 매체사 매출 - 지상파 & 종합/유선 정밀 파이프라인]
-            for i in range(len(df)):
-                row_vals = [str(x).strip() for x in df.iloc[i].dropna().tolist()]
-                row_text = " ".join(row_vals).upper()
-
-                is_terrestrial = any(k in row_text for k in ["지상파 매출", "지상파 광고", "지상파방송"])
-                is_cable = any(k in row_text for k in ["종합/유선채널", "유선채널", "종합편성", "케이블", "CJ ENM", "CJ E&M", "주요 PP"])
-
-                if is_terrestrial or is_cable:
-                    max_offset = 18 if is_terrestrial else 45
-                    cat_name = "지상파" if is_terrestrial else "종편/유선/PP"
-
-                    start_header_idx = i + 1
-                    for h_off in range(1, 5):
-                        if i + h_off >= len(df): break
-                        h_chk = "".join([str(c).replace(" ", "").upper() for c in df.iloc[i + h_off].tolist() if pd.notna(c)])
-                        if any(k in h_chk for k in ["마감", "START", "실제", "예상", "채널", "구분"]):
-                            start_header_idx = i + h_off
-                            break
-
-                    header_combined_cols = []
-                    for c_idx in range(len(df.columns)):
-                        text_parts = []
-                        for h_r in range(start_header_idx, min(len(df), start_header_idx + 3)):
-                            val = df.iloc[h_r, c_idx]
-                            if pd.notna(val):
-                                text_parts.append(str(val).strip())
-                        header_combined_cols.append(" ".join(text_parts))
-
-                    # 인덱스 초기화
-                    t_start_col = -1 # 지상파 Start ('예상 마감', 대상월: ym)
-                    t_close_col = -1 # 지상파 마감 ('실제 마감', 대상월: prev_ym)
-                    c_start_col = -1 # 종합/유선 Start ('Start계수', 대상월: ym)
-                    c_close_col = -1 # 종합/유선 마감 ('최종마감', 대상월: prev_ym)
-
-                    for c_i, h_full in enumerate(header_combined_cols):
-                        h_clean = re.sub(r'[\s\n\r]', '', h_full).upper()
-
-                        # 누적, 누계, 물결표(~, ～, 〜), 하이픈 범위(-), 전년, 증감 단어 완전 배제
-                        if any(bad in h_clean for bad in ["누적", "누계", "~", "～", "〜", "전년", "증감"]):
-                            continue
-                        if re.search(r'\d+[~\-～〜]\d+', h_full):
-                            continue
-                        if re.search(r'[~\-～〜]\d+', h_full):
-                            continue
-                        if "계수" in h_clean and "START" not in h_clean:
-                            continue
-
-                        # 1. 지상파
-                        if is_terrestrial:
-                            # Start: '예상' (당월 ym의 Start)
-                            if "예상" in h_clean and t_start_col == -1:
-                                m_h = re.search(r'(\d{4})[.\s]*(\d{1,2})', h_full)
-                                if m_h:
-                                    if m_h.group(1) == year_str and (int(m_h.group(2)) == cur_m_int or cur_m_int == -1):
-                                        t_start_col = c_i
-                                else:
-                                    t_start_col = c_i
-
-                            # 마감: '실제' (전월 prev_ym의 마감, 예: 6월 실제 마감)
-                            # 증감액/차액 열 오인식 방지
-                            elif "실제" in h_clean and "마감" in h_clean and t_close_col == -1:
-                                m_h = re.search(r'(\d{4})[.\s]*(\d{1,2})', h_full)
-                                if m_h:
-                                    if m_h.group(1) == prev_year_str and (int(m_h.group(2)) == prev_m_int or prev_m_int == -1):
-                                        t_close_col = c_i
-                                else:
-                                    t_close_col = c_i
-
-                        # 2. 종합/유선채널
-                        else:
-                            # Start: 'START' (당월 ym의 Start)
-                            if "START" in h_clean and c_start_col == -1:
-                                c_start_col = c_i
-
-                            # 마감: '최종마감' (단월 마감, 전월 prev_ym의 마감)
-                            elif ("최종마감" in h_clean or ("최종" in h_clean and "마감" in h_clean)) and c_close_col == -1:
-                                m_h = re.search(r'(\d{4})[.\s]*(\d{1,2})', h_full)
-                                if m_h:
-                                    t_y = m_h.group(1)
-                                    t_m = int(m_h.group(2))
-                                    if t_y == prev_year_str and (t_m == prev_m_int or prev_m_int == -1):
-                                        c_close_col = c_i
-                                else:
-                                    c_close_col = c_i
-
-                    # 데이터 행 스캔 및 적재
-                    data_start_r = start_header_idx + 2
-                    for r_offset in range(data_start_r, min(len(df), i + max_offset)):
-                        sub_row = df.iloc[r_offset].tolist()
-                        sub_row_str = " ".join([str(x) for x in sub_row if pd.notna(x)])
-
-                        if any(ign in sub_row_str for ign in ["합계", "소계", "Total", "TOTAL", "단위:", "전년동기", "증감률"]):
-                            continue
-
-                        matched_ch = None
-                        for item in sub_row[:3]:
-                            if pd.notna(item):
-                                it_upper = str(item).strip().upper().replace(" ", "")
-                                if not matched_ch:
-                                    for k_name in sorted(KNOWN_MEDIA_DICT.keys(), key=len, reverse=True):
-                                        k_clean = k_name.upper().replace(" ", "")
-                                        if k_clean in it_upper and "TOTAL" not in it_upper and "합계" not in it_upper:
-                                            matched_ch = KNOWN_MEDIA_DICT[k_name]
-                                            break
-
-                        if matched_ch:
-                            # 1) 지상파 적재 (Start: 당월 예상마감 / 마감: 익월 파일 내 실제마감)
-                            if is_terrestrial:
-                                # Start 적재
-                                if t_start_col != -1 and t_start_col < len(sub_row):
-                                    s_val = extract_clean_number(sub_row[t_start_col])
-                                    if s_val is not None and s_val > 0:
-                                        tv_sales_list.append({
-                                            "연월": ym,
-                                            "연도": year_str,
-                                            "월": f"{int(month_str)}월" if month_str.isdigit() else month_str,
-                                            "채널": matched_ch,
-                                            "매출(억원)": s_val,
-                                            "구분": "Start",
-                                            "채널구분": cat_name
-                                        })
-
-                                # 마감 적재 (전월 prev_ym의 마감값으로 적재)
-                                if t_close_col != -1 and t_close_col < len(sub_row):
-                                    c_val = extract_clean_number(sub_row[t_close_col])
-                                    if c_val is not None and c_val > 0 and prev_ym != "기타":
-                                        tv_sales_list.append({
-                                            "연월": prev_ym,
-                                            "연도": prev_year_str,
-                                            "월": prev_month_str,
-                                            "채널": matched_ch,
-                                            "매출(억원)": c_val,
-                                            "구분": "마감",
-                                            "채널구분": cat_name
-                                        })
-
-                            # 2) 종합/유선채널 적재 (Start: 당월 Start계수 / 마감: 익월 파일 내 최종마감)
-                            else:
-                                # Start 적재
-                                if c_start_col != -1 and c_start_col < len(sub_row):
-                                    s_num = extract_clean_number(sub_row[c_start_col])
-                                    if s_num is not None and s_num > 0:
-                                        tv_sales_list.append({
-                                            "연월": ym,
-                                            "연도": year_str,
-                                            "월": f"{int(month_str)}월" if month_str.isdigit() else month_str,
-                                            "채널": matched_ch,
-                                            "매출(억원)": s_num,
-                                            "구분": "Start",
-                                            "채널구분": cat_name
-                                        })
-
-                                # 마감 적재 (전월 prev_ym의 마감값으로 적재, 누적계수 원천 차단)
-                                if c_close_col != -1 and c_close_col < len(sub_row):
-                                    c_num = extract_clean_number(sub_row[c_close_col])
-                                    if c_num is not None and c_num > 0 and prev_ym != "기타":
-                                        tv_sales_list.append({
-                                            "연월": prev_ym,
-                                            "연도": prev_year_str,
-                                            "월": prev_month_str,
-                                            "채널": matched_ch,
-                                            "매출(억원)": c_num,
-                                            "구분": "마감",
-                                            "채널구분": cat_name
-                                        })
         except Exception as e:
             st.error(f"{f} 파싱 오류: {e}")
+
+    # 2. [매출 데이터] sales_master.xlsx 단일 마스터 파일에서 직접 로드
+    df_agency = pd.DataFrame()
+    df_tv = pd.DataFrame()
+
+    if os.path.exists(MASTER_SALES_FILE):
+        try:
+            df_m = pd.read_excel(MASTER_SALES_FILE)
+            # 컬럼 표준화 정제
+            df_m.columns = [str(c).strip() for c in df_m.columns]
             
-    df_ag_raw = pd.DataFrame(agency_sales_list)
-    if not df_ag_raw.empty:
-        df_ag_raw = df_ag_raw.drop_duplicates(subset=["연월", "대행사", "구분"], keep="first")
+            # Start/마감 컬럼명 유연 처리
+            start_col_name = "Start(억원)" if "Start(억원)" in df_m.columns else "Start"
+            close_col_name = "마감(억원)" if "마감(억원)" in df_m.columns else "마감"
+            
+            # 연도 및 월 보조 컬럼 생성
+            df_m["연월"] = df_m["연월"].astype(str).str.strip()
+            df_m["연도"] = df_m["연월"].apply(lambda x: x.split("-")[0] if "-" in x else "")
+            df_m["월"] = df_m["연월"].apply(lambda x: f"{int(x.split('-')[1])}월" if "-" in x and len(x.split('-')) > 1 and x.split('-')[1].isdigit() else "")
 
-    df_tv_raw = pd.DataFrame(tv_sales_list)
-    if not df_tv_raw.empty:
-        df_tv_raw = df_tv_raw.drop_duplicates(subset=["연월", "채널", "구분"], keep="first")
+            # A. 대행사 데이터 분리 (Unpivot: Start vs 마감)
+            df_m_ag = df_m[df_m["분류"] == "대행사"].copy()
+            if not df_m_ag.empty:
+                ag_records = []
+                for _, r in df_m_ag.iterrows():
+                    ag_name = str(r["회사/채널명"]).strip()
+                    if pd.notna(r.get(start_col_name)) and float(r[start_col_name]) > 0:
+                        ag_records.append({
+                            "연월": r["연월"], "연도": r["연도"], "월": r["월"],
+                            "대행사": ag_name, "구분": "Start", "매출(억원)": float(r[start_col_name])
+                        })
+                    if pd.notna(r.get(close_col_name)) and float(r[close_col_name]) > 0:
+                        ag_records.append({
+                            "연월": r["연월"], "연도": r["연도"], "월": r["월"],
+                            "대행사": ag_name, "구분": "마감", "매출(억원)": float(r[close_col_name])
+                        })
+                df_agency = pd.DataFrame(ag_records)
 
-    return pd.DataFrame(issues_list), df_tv_raw, pd.DataFrame(pt_list), df_ag_raw, all_files
+            # B. 방송 매체사 데이터 분리 (지상파 & 종편/유선)
+            df_m_tv = df_m[df_m["분류"].isin(["지상파", "종편/유선", "케이블", "종편"])].copy()
+            if not df_m_tv.empty:
+                tv_records = []
+                for _, r in df_m_tv.iterrows():
+                    ch_name = str(r["회사/채널명"]).strip()
+                    c_type = "지상파" if r["분류"] == "지상파" else "종편/유선/PP"
+                    if pd.notna(r.get(start_col_name)) and float(r[start_col_name]) > 0:
+                        tv_records.append({
+                            "연월": r["연월"], "연도": r["연도"], "월": r["월"],
+                            "채널": ch_name, "채널구분": c_type, "구분": "Start", "매출(억원)": float(r[start_col_name])
+                        })
+                    if pd.notna(r.get(close_col_name)) and float(r[close_col_name]) > 0:
+                        tv_records.append({
+                            "연월": r["연월"], "연도": r["연도"], "월": r["월"],
+                            "채널": ch_name, "채널구분": c_type, "구분": "마감", "매출(억원)": float(r[close_col_name])
+                        })
+                df_tv = pd.DataFrame(tv_records)
+        except Exception as e:
+            st.error(f"sales_master.xlsx 로드 오류: {e}")
+
+    return pd.DataFrame(issues_list), df_tv, pd.DataFrame(pt_list), df_agency, monthly_report_files
 
 # --- 4. 로그인 및 회원가입 화면 ---
 if not st.session_state["logged_in"]:
@@ -1008,7 +721,7 @@ if not st.session_state["logged_in"]:
                     st.success("회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인하실 수 있습니다.")
     st.stop()
 
-# --- 5. 로그인 성공 후 사이드바 제어판 및 [유사건 유추 최신 데이터 우선 병합] ---
+# --- 5. 로그인 성공 후 사이드바 제어판 ---
 df_issues, df_tv, df_pt, df_agency, loaded_files = load_all_data()
 
 def normalize_match_key(text):
@@ -1034,7 +747,7 @@ def get_stay_duration_str():
         return f"{minutes}분 {seconds}초"
     return "집계 불가"
 
-# [사이드바 메인 엠블럼 헤더]
+# 사이드바 메인 엠블럼 헤더
 st.sidebar.markdown("""
 <div style="background: linear-gradient(180deg, #13213B 0%, #0F1A2E 100%); border: 1px solid #1E2E4A; border-top: 3px solid #3B82F6; border-radius: 6px; padding: 14px 14px 12px 14px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.2);">
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
@@ -1047,7 +760,7 @@ st.sidebar.markdown("""
         월간 미디어·광고<br>업계 동향 대시보드
     </div>
     <div style="font-size: 0.70rem; color: #94A3B8; line-height: 1.35;">
-        2021년 9월 이후 축적 동향 인텔리전스
+        마스터 데이터 연동 인텔리전스
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -1127,7 +840,7 @@ if not api_key:
 else:
     st.sidebar.caption("Gemini AI 연동 활성화됨")
 
-# 마스터 전용 사이드바 메뉴
+# 관리자 콘솔
 if st.session_state["role"] == "admin":
     st.sidebar.markdown("---")
     st.sidebar.markdown("<div style='font-size:0.72rem; color:#94A3B8; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:8px; font-weight:700;'>ADMIN CONSOLE</div>", unsafe_allow_html=True)
@@ -1161,10 +874,13 @@ if st.session_state["role"] == "admin":
         else:
             st.caption("현재 승인 대기자가 없습니다.")
 
-    # 엑셀 업로더
-    new_file = st.sidebar.file_uploader("월간 엑셀 추가 (.xlsx)", type=["xlsx"])
+    # 마스터 엑셀 / 월간 보고서 업로더
+    new_file = st.sidebar.file_uploader("엑셀 파일 업데이트 (.xlsx)", type=["xlsx"], help="sales_master.xlsx 또는 월간 엑셀을 업로드합니다.")
     if new_file is not None:
-        save_path = os.path.join(DATA_DIR, new_file.name)
+        if new_file.name == "sales_master.xlsx":
+            save_path = "sales_master.xlsx"
+        else:
+            save_path = os.path.join(DATA_DIR, new_file.name)
         with open(save_path, "wb") as f:
             f.write(new_file.getbuffer())
         st.sidebar.success(f"{new_file.name} 저장 완료")
@@ -1173,7 +889,10 @@ if st.session_state["role"] == "admin":
         st.rerun()
 
 st.sidebar.markdown("---")
-st.sidebar.caption(f"적재 완료 파일: **{len(loaded_files)}건**")
+if os.path.exists(MASTER_SALES_FILE):
+    st.sidebar.caption("✅ **sales_master.xlsx** 마스터 연동 중")
+else:
+    st.sidebar.warning("⚠️ sales_master.xlsx 미연동 상태")
 
 # =========================================================================
 # 6. [관리자 전용 페이지] 회원 관리 및 활동 로그
@@ -1307,11 +1026,12 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
 # =========================================================================
 # 7. [메인 화면] 메인 캔버스
 # =========================================================================
+# 전 카테고리 통합 실시간 검색
 search_container = st.container(border=True)
 with search_container:
     st.markdown("""
     <h3 style="margin: 0 0 4px 0; font-size: 1.10rem; font-weight: 700; color: #0F172A;">🔍 전 카테고리 통합 실시간 검색</h3>
-    <p style="margin: 0 0 12px 0; font-size: 0.82rem; color: #64748B;">키워드를 입력하면 모든 엑셀 데이터(주요 이슈, 경쟁 PT, 대행사 및 매체사 매출)에서 즉시 찾아냅니다.</p>
+    <p style="margin: 0 0 12px 0; font-size: 0.82rem; color: #64748B;">키워드를 입력하면 모든 데이터(주요 이슈, 경쟁 PT, 대행사 및 매체사 매출)에서 즉시 찾아냅니다.</p>
     """, unsafe_allow_html=True)
     
     global_query = st.text_input(
@@ -1387,9 +1107,7 @@ with search_container:
         if tot_cnt == 0:
             st.warning(f"'{global_query}'에 대한 검색 결과가 없습니다.")
 
-# =========================================================================
-# 7. [메인 화면] 3. 카테고리 캡슐 버튼 선택 (라디오 원형 체크마크 ◯ / ◉ 결합)
-# =========================================================================
+# 카테고리 캡슐 버튼
 categories = [
     "광고회사 PT 수주 현황", 
     "대행사/매체사 매출 동향", 
@@ -1455,7 +1173,7 @@ with body_container:
     # 탭 2: 매출 동향
     elif selected_category == "대행사/매체사 매출 동향":
         st.markdown("<h3 style='font-size: 1.20rem; font-weight: 700; color: #0F172A; margin-bottom: 2px;'>광고대행사 및 방송 매체사 매출 추이 & YoY 분석</h3>", unsafe_allow_html=True)
-        st.caption("대행사 전파광고 및 방송사 매출 통계(Start vs 마감)입니다. 누적계수는 완전 배제되며, 최신월의 마감값은 익월 파일 등록 시 업데이트됩니다.")
+        st.caption("sales_master.xlsx 마스터 시트와 100% 동기화된 정밀 매출(Start vs 마감) 통계입니다.")
         st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
         
         view_mode = st.radio(
@@ -1568,9 +1286,9 @@ with body_container:
                     else:
                         st.caption("축적된 연도 데이터가 2개 이상일 때 YoY 분석이 가능합니다.")
             else:
-                st.info("대행사 전파광고 매출 데이터를 집계 중입니다.")
+                st.info("sales_master.xlsx 파일의 대행사 매출 데이터를 확인 중입니다.")
 
-        # [우측] 방송 매체사 영역 (지상파/종합유선 Start vs 마감 듀얼 막대그래프)
+        # [우측] 방송 매체사 영역 (Start vs 마감 듀얼 막대그래프)
         with col_r:
             st.markdown("##### 방송 매체사 광고 매출 (Start vs 마감)")
             if not df_tv.empty:
@@ -1598,7 +1316,7 @@ with body_container:
                         color="구분",
                         barmode="group",
                         text_auto=".1f",
-                        title=f"[{selected_single_tv}] 매출 추이 ({selected_tv_year})",
+                        title=f"[{selected_single_tv}] 매출 추이 - Start vs 마감 ({selected_tv_year})",
                         color_discrete_map={"Start": "#60A5FA", "마감": "#1E3A8A"}
                     )
                     fig_tv.update_layout(
@@ -1643,7 +1361,7 @@ with body_container:
                             df_yoy_tv["월순서"] = df_yoy_tv["월"].apply(month_sort_key)
                             df_yoy_tv = df_yoy_tv.sort_values(by="월순서").drop(columns=["월순서"])
                             
-                            df_yoy_tv["증감액(억원)"] = df_yoy_tv[f"{yoy_tv_base}년"] - df_yoy_tv[f"{prev_tv_year}년"]
+                            df_yoy_tv["증감액(억원)"] = df_yoy_tv[f"{yoy_base_year}년"] - df_yoy_tv[f"{prev_tv_year}년"]
                             df_yoy_tv["YoY 증감률(%)"] = df_yoy_tv.apply(
                                 lambda r: f"{((r[f'{yoy_tv_base}년'] - r[f'{prev_tv_year}년']) / r[f'{prev_tv_year}년'] * 100):+.1f}%" 
                                 if r[f"{prev_tv_year}년"] > 0 else "-", axis=1
@@ -1671,7 +1389,7 @@ with body_container:
                     else:
                         st.caption("축적된 연도 데이터가 2개 이상일 때 YoY 분석이 가능합니다.")
             else:
-                st.info("방송사 광고 매출 데이터를 집계 중입니다.")
+                st.info("sales_master.xlsx 파일의 방송사 매출 데이터를 확인 중입니다.")
 
     # 탭 3: 이슈 브리핑
     elif selected_category == "월별 핵심 이슈 브리핑":
@@ -1693,7 +1411,7 @@ with body_container:
     # 탭 4: AI 동향 분석가
     elif selected_category == "AI 동향 분석가":
         st.markdown("<h3 style='font-size: 1.20rem; font-weight: 700; color: #0F172A; margin-bottom: 2px;'>AI 기반 인텔리전스 분석 어시스턴트</h3>", unsafe_allow_html=True)
-        st.caption("대시보드에 축적된 4대 핵심 빅데이터(경쟁 PT 전수, 대행사·매체사 매출 실적, 월별 핵심 이슈)를 100% 전수 분석합니다.")
+        st.caption("마스터 시트와 전수 모니터링 데이터를 통합 분석합니다.")
         st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
         
         if not api_key:
@@ -1705,7 +1423,7 @@ with body_container:
                 model = genai.GenerativeModel(target_model)
                 st.caption(f"연결 모델: `{target_model}` | 통합 분석 데이터셋: PT {len(df_pt_unique):,}건, 대행사매출 {len(df_agency):,}건, 매체사매출 {len(df_tv):,}건, 이슈 {len(df_issues):,}건")
                 
-                user_question = st.text_input("질문을 입력하세요", placeholder="예: 제일기획이 선정사(결과)로 수주한 모든 광고 목록과 업종별 특징, 빌링 합계를 분석해줘")
+                user_question = st.text_input("질문을 입력하세요", placeholder="예: 제일기획이 선정한 광고주 목록 및 2026년 방송사별 매출 추이를 종합 분석해줘")
                 
                 if st.button("AI 분석 요청", type="primary") and user_question:
                     with st.spinner("전체 데이터베이스를 전수 스캔하여 심층 리포트를 작성 중입니다..."):
@@ -1721,10 +1439,10 @@ with body_container:
 [1. 전체 광고회사 PT 수주 현황 데이터 (전체 {len(df_pt_unique)}건 누락 없음)]
 {pt_full_csv}
 
-[2. 대행사 전파광고 매출 데이터 (전체 {len(df_agency)}건, Start/마감 구분 포함)]
+[2. 대행사 전파광고 매출 데이터 (마스터 시트 기준, Start/마감 구분 포함)]
 {agency_full_csv}
 
-[3. 방송 매체사 광고 매출 데이터 (전체 {len(df_tv)}건, Start/마감 구분 포함)]
+[3. 방송 매체사 광고 매출 데이터 (마스터 시트 기준, 지상파/종편유선 Start/마감 포함)]
 {tv_full_csv}
 
 [4. 월별 업계 주요 이슈 브리핑 데이터]
@@ -1734,11 +1452,10 @@ with body_container:
 {user_question}
 
 작성 지침:
-1. 반드시 제공된 [1. 전체 광고회사 PT 수주 현황 데이터]의 수백 건 행을 전수 스캔하여 질문 대상(예: 특정 대행사가 '선정사(결과)'에 명시된 모든 건)을 단 하나도 누락 없이 전수 집계하세요.
-2. 집계된 프로젝트들의 세부 내역(일자, 광고주, 품목, 빌링, 기존사, 참여사 등)을 명확하게 제시하고, 총 수주 건수 및 합산 빌링 규모를 정확히 계산하여 서술하세요.
-3. 업종/품목별 수주 패턴, 주요 경쟁 구도(누구를 제치고 수주했는지) 등 데이터 기반의 전략적 인사이트를 체계적으로 분석하세요.
-4. 가독성을 위해 항목별 불릿 포인트와 볼드(**)를 적극 활용하여 완성도 높은 리포트 형식으로 작성하세요.
-5. 데이터에 명시된 사실에만 입각하여 서술하세요.
+1. 반드시 제공된 데이터를 전수 검토하여 수치와 회사명을 정확히 대조하여 서술하세요.
+2. 수치 분석 시 Start vs 마감의 차이점 및 추이를 분석하고 명확한 비즈니스 인사이트를 도출하세요.
+3. 가독성을 위해 불릿 포인트와 볼드(**)를 적극 활용하여 완성도 높은 리포트 형식으로 작성하세요.
+4. 데이터에 명시된 사실에만 입각하여 서술하세요.
 """
                         response = model.generate_content(prompt)
                         
