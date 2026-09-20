@@ -20,12 +20,12 @@ LOG_DB_FILE = "activity_logs.json"
 MASTER_SALES_FILE = "sales_master.xlsx"
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# GitHub API 연동 설정 (media-trend)
+# GitHub API 연동 설정
 GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", None)
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "Mickie-Park/media-trend")
 FILE_PATH = "users.json"
 
-# --- 2. CSS 스타일링 (올 화이트 캔버스 + 캡슐 버튼 + 스카이블루 검색바 테두리) ---
+# --- 2. CSS 스타일링 ---
 st.markdown("""
 <style>
     @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
@@ -301,7 +301,6 @@ def is_user_approved(val):
         return val == 1
     return False
 
-# 회원 DB 로드
 def load_users():
     default_admin = {
         "admin": {
@@ -340,7 +339,6 @@ def load_users():
     save_users(default_admin)
     return default_admin
 
-# 회원 DB 저장
 def save_users(users_dict):
     with open(USER_DB_FILE, "w", encoding="utf-8") as f:
         json.dump(users_dict, f, ensure_ascii=False, indent=4)
@@ -432,7 +430,7 @@ def load_activity_logs():
 
 users_db = load_users()
 
-# --- 세션 상태 초기화 및 새로고침(F5) 유지 처리 ---
+# 세션 상태 초기화
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
     st.session_state["username"] = None
@@ -478,7 +476,6 @@ def load_all_data():
         if v.lower() in ["nan", "none", "-"]: return ""
         return v
 
-    # 1. 54개 원본 파일에서 [주요 Issue 요약] 및 [광고회사 PT 현황] 파싱 (기존 안정 로직 유지)
     for f in monthly_report_files:
         m = re.search(r'(\d{4})(\d{2})', f)
         ym = f"{m.group(1)}-{m.group(2)}" if m else "기타"
@@ -488,7 +485,6 @@ def load_all_data():
             xls = pd.ExcelFile(f)
             df = pd.read_excel(f, sheet_name=xls.sheet_names[0])
             
-            # A. 주요 Issue 요약
             current_issue = ""
             for idx, val in df['Unnamed: 0'].dropna().items():
                 text = str(val).strip()
@@ -500,7 +496,6 @@ def load_all_data():
                 elif current_issue and text.startswith("-"):
                     issues_list.append({"연월": ym, "헤드라인": current_issue, "상세": text[1:].strip()})
             
-            # B. 광고회사 PT 현황
             for p_idx in range(len(df)):
                 row_cells = [clean_str(x) for x in df.iloc[p_idx].tolist()]
                 row_text_no_space = "".join(row_cells).replace(" ", "")
@@ -592,26 +587,22 @@ def load_all_data():
         except Exception as e:
             st.error(f"{f} 파싱 오류: {e}")
 
-    # 2. [매출 데이터] sales_master.xlsx 단일 마스터 파일에서 직접 로드
     df_agency = pd.DataFrame()
     df_tv = pd.DataFrame()
 
     if os.path.exists(MASTER_SALES_FILE):
         try:
             df_m = pd.read_excel(MASTER_SALES_FILE)
-            # 컬럼 표준화 정제
             df_m.columns = [str(c).strip() for c in df_m.columns]
             
-            # Start/마감 컬럼명 유연 처리
             start_col_name = "Start(억원)" if "Start(억원)" in df_m.columns else "Start"
             close_col_name = "마감(억원)" if "마감(억원)" in df_m.columns else "마감"
             
-            # 연도 및 월 보조 컬럼 생성
             df_m["연월"] = df_m["연월"].astype(str).str.strip()
             df_m["연도"] = df_m["연월"].apply(lambda x: x.split("-")[0] if "-" in x else "")
             df_m["월"] = df_m["연월"].apply(lambda x: f"{int(x.split('-')[1])}월" if "-" in x and len(x.split('-')) > 1 and x.split('-')[1].isdigit() else "")
 
-            # A. 대행사 데이터 분리 (Unpivot: Start vs 마감)
+            # A. 대행사 데이터 분리
             df_m_ag = df_m[df_m["분류"] == "대행사"].copy()
             if not df_m_ag.empty:
                 ag_records = []
@@ -629,7 +620,7 @@ def load_all_data():
                         })
                 df_agency = pd.DataFrame(ag_records)
 
-            # B. 방송 매체사 데이터 분리 (지상파 & 종편/유선)
+            # B. 방송 매체사 데이터 분리
             df_m_tv = df_m[df_m["분류"].isin(["지상파", "종편/유선", "케이블", "종편"])].copy()
             if not df_m_tv.empty:
                 tv_records = []
@@ -651,75 +642,6 @@ def load_all_data():
             st.error(f"sales_master.xlsx 로드 오류: {e}")
 
     return pd.DataFrame(issues_list), df_tv, pd.DataFrame(pt_list), df_agency, monthly_report_files
-
-# --- 4. 로그인 및 회원가입 화면 ---
-if not st.session_state["logged_in"]:
-    st.markdown("""
-    <div style="padding: 20px 0 16px 0; border-bottom: 2px solid #1E3A8A; margin-bottom: 18px;">
-        <span style="font-size: 0.70rem; font-weight: 700; letter-spacing: 0.08em; color: #B45309; background: #FEF3C7; padding: 3px 8px; border-radius: 4px; border: 1px solid #FDE68A;">INTERNAL ACCESS ONLY</span>
-        <h1 style="font-size: 1.50rem; font-weight: 700; color: #0F172A; margin: 8px 0 4px 0; letter-spacing: -0.02em;">월간 미디어·광고 인텔리전스 리포트</h1>
-        <p style="font-size: 0.85rem; color: #64748B; margin: 0;">인가된 사내 사용자를 위한 전략 리서치 포털입니다. 등록된 계정으로 로그인해 주세요.</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    login_tab, signup_tab = st.tabs(["로그인", "회원가입 신청"])
-    
-    with login_tab:
-        with st.form("login_form"):
-            login_id = st.text_input("아이디").strip()
-            login_pw = st.text_input("비밀번호", type="password")
-            submit_login = st.form_submit_button("로그인", type="primary")
-            
-            if submit_login:
-                users_current = load_users()
-                if login_id in users_current:
-                    user_info = users_current[login_id]
-                    
-                    if user_info["password"] == hash_password(login_pw):
-                        if is_user_approved(user_info.get("approved", False)):
-                            st.session_state["logged_in"] = True
-                            st.session_state["username"] = login_id
-                            st.session_state["role"] = user_info.get("role", "member")
-                            st.session_state["user_name"] = user_info.get("name", login_id)
-                            st.session_state["login_time"] = get_now_kst()
-                            
-                            st.query_params["user"] = login_id
-                            log_activity(login_id, st.session_state["user_name"], "로그인", "시스템 로그인 성공")
-                            st.rerun()
-                        else:
-                            st.warning("관리자 승인 대기 중입니다. 승인 완료 후 이용하실 수 있습니다.")
-                    else:
-                        st.error("비밀번호가 올바르지 않습니다.")
-                else:
-                    st.error("등록되지 않은 사용자 아이디입니다.")
-
-    with signup_tab:
-        with st.form("signup_form"):
-            new_id = st.text_input("희망 아이디 (영문/숫자)").strip()
-            new_name = st.text_input("이름 (실명 입력)")
-            new_pw = st.text_input("비밀번호", type="password")
-            new_pw_confirm = st.text_input("비밀번호 확인", type="password")
-            submit_signup = st.form_submit_button("가입 신청하기")
-            
-            if submit_signup:
-                users_current = load_users()
-                if not new_id or not new_name or not new_pw:
-                    st.error("모든 항목을 입력해 주세요.")
-                elif new_id in users_current:
-                    st.error("이미 사용 중인 아이디입니다. 다른 아이디를 입력해 주세요.")
-                elif new_pw != new_pw_confirm:
-                    st.error("비밀번호 확인이 일치하지 않습니다.")
-                else:
-                    users_current[new_id] = {
-                        "name": new_name,
-                        "password": hash_password(new_pw),
-                        "role": "member",
-                        "approved": False
-                    }
-                    save_users(users_current)
-                    log_activity(new_id, new_name, "회원가입 신청", f"아이디 '{new_id}' 가입 신청")
-                    st.success("회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인하실 수 있습니다.")
-    st.stop()
 
 # --- 5. 로그인 성공 후 사이드바 제어판 ---
 df_issues, df_tv, df_pt, df_agency, loaded_files = load_all_data()
@@ -874,7 +796,6 @@ if st.session_state["role"] == "admin":
         else:
             st.caption("현재 승인 대기자가 없습니다.")
 
-    # 마스터 엑셀 / 월간 보고서 업로더
     new_file = st.sidebar.file_uploader("엑셀 파일 업데이트 (.xlsx)", type=["xlsx"], help="sales_master.xlsx 또는 월간 엑셀을 업로드합니다.")
     if new_file is not None:
         if new_file.name == "sales_master.xlsx":
@@ -1026,7 +947,6 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
 # =========================================================================
 # 7. [메인 화면] 메인 캔버스
 # =========================================================================
-# 전 카테고리 통합 실시간 검색
 search_container = st.container(border=True)
 with search_container:
     st.markdown("""
@@ -1107,7 +1027,7 @@ with search_container:
         if tot_cnt == 0:
             st.warning(f"'{global_query}'에 대한 검색 결과가 없습니다.")
 
-# 카테고리 캡슐 버튼
+# 카테고리 선택
 categories = [
     "광고회사 PT 수주 현황", 
     "대행사/매체사 매출 동향", 
@@ -1185,7 +1105,7 @@ with body_container:
         
         col_l, col_r = st.columns(2)
         
-        # [좌측] 대행사 영역 (Start vs 마감 듀얼 막대그래프)
+        # [좌측] 대행사 영역
         with col_l:
             st.markdown("##### 주요 광고대행사 전파광고 매출 (Start vs 마감)")
             if not df_agency.empty:
@@ -1288,7 +1208,7 @@ with body_container:
             else:
                 st.info("sales_master.xlsx 파일의 대행사 매출 데이터를 확인 중입니다.")
 
-        # [우측] 방송 매체사 영역 (Start vs 마감 듀얼 막대그래프)
+        # [우측] 방송 매체사 영역
         with col_r:
             st.markdown("##### 방송 매체사 광고 매출 (Start vs 마감)")
             if not df_tv.empty:
@@ -1361,7 +1281,8 @@ with body_container:
                             df_yoy_tv["월순서"] = df_yoy_tv["월"].apply(month_sort_key)
                             df_yoy_tv = df_yoy_tv.sort_values(by="월순서").drop(columns=["월순서"])
                             
-                            df_yoy_tv["증감액(억원)"] = df_yoy_tv[f"{yoy_base_year}년"] - df_yoy_tv[f"{prev_tv_year}년"]
+                            # [오타 수정 완료: yoy_base_year -> yoy_tv_base]
+                            df_yoy_tv["증감액(억원)"] = df_yoy_tv[f"{yoy_tv_base}년"] - df_yoy_tv[f"{prev_tv_year}년"]
                             df_yoy_tv["YoY 증감률(%)"] = df_yoy_tv.apply(
                                 lambda r: f"{((r[f'{yoy_tv_base}년'] - r[f'{prev_tv_year}년']) / r[f'{prev_tv_year}년'] * 100):+.1f}%" 
                                 if r[f"{prev_tv_year}년"] > 0 else "-", axis=1
