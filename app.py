@@ -541,6 +541,7 @@ if not st.session_state["logged_in"]:
                     log_activity(new_id, new_name, "회원가입 신청", f"아이디 '{new_id}' 가입 신청")
                     st.success("회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인하실 수 있습니다.")
     
+    # 미로그인 시 본문 100% 원천 차단
     st.stop()
 
 # =========================================================================
@@ -1014,12 +1015,10 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
         if not df_logs.empty:
             l_col1, l_col2, l_col3 = st.columns([2, 2, 2])
             with l_col1:
-                # [안전 정렬: 결측치 배제 및 문자열 강제 변환]
                 clean_users = [str(x) for x in df_logs["아이디"].dropna().unique() if str(x).strip()]
                 user_list_for_log = ["전체 회원"] + sorted(clean_users)
                 selected_log_user = st.selectbox("회원별 필터링", user_list_for_log)
             with l_col2:
-                # [안전 정렬: 결측치 배제 및 문자열 강제 변환]
                 clean_actions = [str(x) for x in df_logs["활동 구분"].dropna().unique() if str(x).strip()]
                 action_types = ["전체 활동"] + sorted(clean_actions)
                 selected_action = st.selectbox("활동 유형별 필터링", action_types)
@@ -1432,10 +1431,10 @@ with body_container:
         else:
             st.info("이슈 데이터가 없습니다.")
 
-    # 탭 4: AI 동향 분석가
+    # 탭 4: AI 동향 분석가 (최신 Gemini 3.8 Flash 엔진 연동)
     elif selected_category == "AI 동향 분석가":
         st.markdown("<h3 style='font-size: 1.20rem; font-weight: 700; color: #0F172A; margin-bottom: 2px;'>AI 기반 인텔리전스 분석 어시스턴트</h3>", unsafe_allow_html=True)
-        st.caption("마스터 시트와 전수 모니터링 데이터를 통합 분석합니다.")
+        st.caption("마스터 시트와 전수 모니터링 데이터를 최신 차세대 AI(Gemini 3.8)로 통합 분석합니다.")
         st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
         
         if not api_key:
@@ -1443,14 +1442,14 @@ with body_container:
         else:
             try:
                 genai.configure(api_key=api_key)
-                target_model = "gemini-3.6-flash"
+                target_model = "gemini-3.8-flash"
                 model = genai.GenerativeModel(target_model)
                 st.caption(f"연결 모델: `{target_model}` | 통합 분석 데이터셋: PT {len(df_pt_unique):,}건, 대행사매출 {len(df_agency):,}건, 매체사매출 {len(df_tv):,}건, 이슈 {len(df_issues):,}건")
                 
-                user_question = st.text_input("질문을 입력하세요", placeholder="예: 제일기획이 선정한 광고주 목록 및 2026년 방송사별 매출 추이를 종합 분석해줘")
+                user_question = st.text_input("질문을 입력하세요", placeholder="예: 2024년 이후 현대자동차 관련 모든 수주 내역과 대행사별 수주 현황을 분석해줘")
                 
                 if st.button("AI 분석 요청", type="primary") and user_question:
-                    with st.spinner("전체 데이터베이스를 전수 스캔하여 심층 리포트를 작성 중입니다..."):
+                    with st.spinner("최신 Gemini 3.8 엔진이 전체 데이터베이스를 전수 스캔하여 심층 리포트를 작성 중입니다..."):
                         pt_full_csv = df_pt_unique[["PT일자", "광고주", "품목", "빌링(억원)", "기존사", "참여사", "선정사(결과)", "메모(비고)"]].to_csv(index=False) if not df_pt_unique.empty else "데이터 없음"
                         agency_full_csv = df_agency[["연월", "대행사", "매출(억원)", "구분"]].to_csv(index=False) if not df_agency.empty else "데이터 없음"
                         tv_full_csv = df_tv[["연월", "채널구분", "채널", "매출(억원)", "구분"]].to_csv(index=False) if not df_tv.empty else "데이터 없음"
