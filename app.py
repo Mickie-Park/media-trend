@@ -404,10 +404,10 @@ def log_activity(username, user_name, action, details=""):
     logs = load_raw_activity_logs()
     logs.append({
         "timestamp": timestamp_str,
-        "username": username,
-        "name": user_name,
-        "action": action,
-        "details": details
+        "username": str(username) if username else "unknown",
+        "name": str(user_name) if user_name else "unknown",
+        "action": str(action),
+        "details": str(details)
     })
     
     if len(logs) > 1500:
@@ -541,14 +541,12 @@ if not st.session_state["logged_in"]:
                     log_activity(new_id, new_name, "회원가입 신청", f"아이디 '{new_id}' 가입 신청")
                     st.success("회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인하실 수 있습니다.")
     
-    # [핵심 보안 조치] 미로그인 상태에서는 이후의 모든 데이터 로드 및 본문 렌더링을 완전히 중단합니다.
     st.stop()
 
 # =========================================================================
 # 5. [인증 완료 사용자 전용] 데이터 로드 및 사이드바 제어판
 # =========================================================================
 
-# sales_master.xlsx 기반 데이터 로드
 @st.cache_data(show_spinner=False)
 def load_all_data():
     raw_files = glob.glob("**/*.[xX][lL][sS][xX]", recursive=True)
@@ -795,7 +793,7 @@ st.sidebar.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# [보안 강화 로그아웃] 쿼리 파라미터 및 세션 완전 초기화
+# 로그아웃 버튼
 if st.sidebar.button("로그아웃", type="primary", use_container_width=True):
     log_activity(
         st.session_state["username"], 
@@ -1016,10 +1014,14 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
         if not df_logs.empty:
             l_col1, l_col2, l_col3 = st.columns([2, 2, 2])
             with l_col1:
-                user_list_for_log = ["전체 회원"] + sorted(df_logs["아이디"].unique().tolist())
+                # [안전 정렬: 결측치 배제 및 문자열 강제 변환]
+                clean_users = [str(x) for x in df_logs["아이디"].dropna().unique() if str(x).strip()]
+                user_list_for_log = ["전체 회원"] + sorted(clean_users)
                 selected_log_user = st.selectbox("회원별 필터링", user_list_for_log)
             with l_col2:
-                action_types = ["전체 활동"] + sorted(df_logs["활동 구분"].unique().tolist())
+                # [안전 정렬: 결측치 배제 및 문자열 강제 변환]
+                clean_actions = [str(x) for x in df_logs["활동 구분"].dropna().unique() if str(x).strip()]
+                action_types = ["전체 활동"] + sorted(clean_actions)
                 selected_action = st.selectbox("활동 유형별 필터링", action_types)
             with l_col3:
                 st.write("")
@@ -1039,9 +1041,9 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
 
             view_logs = df_logs.copy()
             if selected_log_user != "전체 회원":
-                view_logs = view_logs[view_logs["아이디"] == selected_log_user]
+                view_logs = view_logs[view_logs["아이디"].astype(str) == selected_log_user]
             if selected_action != "전체 활동":
-                view_logs = view_logs[view_logs["활동 구분"] == selected_action]
+                view_logs = view_logs[view_logs["활동 구분"].astype(str) == selected_action]
 
             st.caption(f"조회 로그: **{len(view_logs)}건** / 누적 로그: **{len(df_logs)}건**")
             st.dataframe(view_logs, use_container_width=True, hide_index=True)
