@@ -152,5 +152,12 @@
         "name": "정진경",
         "action": "회원가입 신청",
         "details": "아이디 'napor7' 가입 신청"
+    },
+    {
+        "timestamp": "2026-09-21 18:04:34",
+        "username": "admin",
+        "name": "마스터 관리자",
+        "action": "회원 승인",
+        "details": "승인: napor7"
     }
 ]
