@@ -40,5 +40,11 @@
         "password": "639c1115ab55d139a527f7bb3c1a9570bb60cf96f5c13bdaa41a7264a74e748f",
         "role": "member",
         "approved": true
+    },
+    "skb3387": {
+        "name": "윤지민",
+        "password": "0ffe1abd1a08215353c233d6e009613e95eec4253832a761af28ff37ac5a150c",
+        "role": "member",
+        "approved": false
     }
 }
