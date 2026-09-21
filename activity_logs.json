@@ -19,5 +19,12 @@
         "name": null,
         "action": "로그아웃",
         "details": "총 체류 시간: 집계 불가"
+    },
+    {
+        "timestamp": "2026-09-21 11:18:54",
+        "username": "usert",
+        "name": "유저티",
+        "action": "로그인",
+        "details": "시스템 로그인 성공"
     }
 ]
