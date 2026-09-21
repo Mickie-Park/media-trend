@@ -33,5 +33,12 @@
         "name": "마스터 관리자",
         "action": "로그인",
         "details": "시스템 로그인 성공"
+    },
+    {
+        "timestamp": "2026-09-21 13:07:13",
+        "username": "admin",
+        "name": "마스터 관리자",
+        "action": "AI 질의",
+        "details": "질문: ENA 매출 분석해줘...."
     }
 ]
