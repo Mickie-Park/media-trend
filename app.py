@@ -372,7 +372,7 @@ def save_users(users_dict):
     except Exception:
         return False
 
-# 활동 로그 GitHub 기반 영구 로드
+# 활동 로그 GitHub 기반 로드
 def load_raw_activity_logs():
     if GITHUB_TOKEN:
         url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{LOG_FILE_PATH}"
@@ -410,14 +410,12 @@ def log_activity(username, user_name, action, details=""):
         "details": details
     })
     
-    # 최근 1,500건 유지
     if len(logs) > 1500:
         logs = logs[-1500:]
         
     with open(LOG_DB_FILE, "w", encoding="utf-8") as f:
         json.dump(logs, f, ensure_ascii=False, indent=4)
 
-    # GitHub 리포지토리에 커밋하여 영구 저장
     if GITHUB_TOKEN:
         url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{LOG_FILE_PATH}"
         headers = get_github_headers()
@@ -464,6 +462,7 @@ if "logged_in" not in st.session_state:
     st.session_state["login_time"] = None
     st.session_state["admin_view"] = False
 
+# URL 파라미터 자동 로그인 체크 (정상 승인 회원인 경우에만)
 auth_token = st.query_params.get("user", None)
 if auth_token and not st.session_state["logged_in"]:
     users_current = load_users()
@@ -474,7 +473,82 @@ if auth_token and not st.session_state["logged_in"]:
         st.session_state["user_name"] = users_current[auth_token].get("name", auth_token)
         st.session_state["login_time"] = get_now_kst()
 
-# --- 3. [데이터 로드: sales_master.xlsx 기반 단일 진실 공급원 체계] ---
+# =========================================================================
+# 4. [로그인 화면 및 권한 게이트] 미로그인 시 본문 100% 원천 차단
+# =========================================================================
+if not st.session_state["logged_in"]:
+    st.markdown("""
+    <div style="padding: 20px 0 16px 0; border-bottom: 2px solid #1E3A8A; margin-bottom: 18px;">
+        <span style="font-size: 0.70rem; font-weight: 700; letter-spacing: 0.08em; color: #B45309; background: #FEF3C7; padding: 3px 8px; border-radius: 4px; border: 1px solid #FDE68A;">INTERNAL ACCESS ONLY</span>
+        <h1 style="font-size: 1.50rem; font-weight: 700; color: #0F172A; margin: 8px 0 4px 0; letter-spacing: -0.02em;">월간 미디어·광고 인텔리전스 리포트</h1>
+        <p style="font-size: 0.85rem; color: #64748B; margin: 0;">사내 인가된 임직원 전용 시스템입니다. 등록된 계정으로 로그인해 주세요.</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    login_tab, signup_tab = st.tabs(["로그인", "회원가입 신청"])
+    
+    with login_tab:
+        with st.form("login_form"):
+            login_id = st.text_input("아이디").strip()
+            login_pw = st.text_input("비밀번호", type="password")
+            submit_login = st.form_submit_button("로그인", type="primary")
+            
+            if submit_login:
+                users_current = load_users()
+                if login_id in users_current:
+                    user_info = users_current[login_id]
+                    if user_info["password"] == hash_password(login_pw):
+                        if is_user_approved(user_info.get("approved", False)):
+                            st.session_state["logged_in"] = True
+                            st.session_state["username"] = login_id
+                            st.session_state["role"] = user_info.get("role", "member")
+                            st.session_state["user_name"] = user_info.get("name", login_id)
+                            st.session_state["login_time"] = get_now_kst()
+                            st.query_params["user"] = login_id
+                            log_activity(login_id, st.session_state["user_name"], "로그인", "시스템 로그인 성공")
+                            st.rerun()
+                        else:
+                            st.warning("관리자 승인 대기 중입니다. 관리자의 승인 완료 후 이용하실 수 있습니다.")
+                    else:
+                        st.error("비밀번호가 올바르지 않습니다.")
+                else:
+                    st.error("등록되지 않은 사용자 아이디입니다.")
+
+    with signup_tab:
+        with st.form("signup_form"):
+            new_id = st.text_input("희망 아이디 (영문/숫자)").strip()
+            new_name = st.text_input("이름 (실명 입력)")
+            new_pw = st.text_input("비밀번호", type="password")
+            new_pw_confirm = st.text_input("비밀번호 확인", type="password")
+            submit_signup = st.form_submit_button("가입 신청하기")
+            
+            if submit_signup:
+                users_current = load_users()
+                if not new_id or not new_name or not new_pw:
+                    st.error("모든 항목을 입력해 주세요.")
+                elif new_id in users_current:
+                    st.error("이미 사용 중인 아이디입니다. 다른 아이디를 입력해 주세요.")
+                elif new_pw != new_pw_confirm:
+                    st.error("비밀번호 확인이 일치하지 않습니다.")
+                else:
+                    users_current[new_id] = {
+                        "name": new_name,
+                        "password": hash_password(new_pw),
+                        "role": "member",
+                        "approved": False
+                    }
+                    save_users(users_current)
+                    log_activity(new_id, new_name, "회원가입 신청", f"아이디 '{new_id}' 가입 신청")
+                    st.success("회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인하실 수 있습니다.")
+    
+    # [핵심 보안 조치] 미로그인 상태에서는 이후의 모든 데이터 로드 및 본문 렌더링을 완전히 중단합니다.
+    st.stop()
+
+# =========================================================================
+# 5. [인증 완료 사용자 전용] 데이터 로드 및 사이드바 제어판
+# =========================================================================
+
+# sales_master.xlsx 기반 데이터 로드
 @st.cache_data(show_spinner=False)
 def load_all_data():
     raw_files = glob.glob("**/*.[xX][lL][sS][xX]", recursive=True)
@@ -668,7 +742,6 @@ def load_all_data():
 
     return pd.DataFrame(issues_list), df_tv, pd.DataFrame(pt_list), df_agency, monthly_report_files
 
-# --- 5. 로그인 성공 후 사이드바 제어판 ---
 df_issues, df_tv, df_pt, df_agency, loaded_files = load_all_data()
 
 def normalize_match_key(text):
@@ -712,7 +785,7 @@ st.sidebar.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# 사이드바 사용자 정보 카드
+# 사이드바 사용자 프로필
 st.sidebar.markdown(f"""
 <div style="background-color: #13213B; border: 1px solid #243656; border-radius: 5px; padding: 12px; margin-bottom: 12px;">
     <div style="font-size: 0.68rem; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700;">USER PROFILE</div>
@@ -722,7 +795,7 @@ st.sidebar.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# 로그아웃 버튼
+# [보안 강화 로그아웃] 쿼리 파라미터 및 세션 완전 초기화
 if st.sidebar.button("로그아웃", type="primary", use_container_width=True):
     log_activity(
         st.session_state["username"], 
@@ -787,7 +860,7 @@ if not api_key:
 else:
     st.sidebar.caption("Gemini AI 연동 활성화됨")
 
-# 관리자 콘솔
+# 관리자 콘솔 제어부
 if st.session_state["role"] == "admin":
     st.sidebar.markdown("---")
     st.sidebar.markdown("<div style='font-size:0.72rem; color:#94A3B8; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:8px; font-weight:700;'>ADMIN CONSOLE</div>", unsafe_allow_html=True)
@@ -978,7 +1051,7 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
     st.stop()
 
 # =========================================================================
-# 7. [메인 화면] 메인 캔버스
+# 7. [메인 화면] 정회원 인가된 사용자에게만 노출되는 대시보드 본문
 # =========================================================================
 search_container = st.container(border=True)
 with search_container:
@@ -1060,7 +1133,6 @@ with search_container:
         if tot_cnt == 0:
             st.warning(f"'{global_query}'에 대한 검색 결과가 없습니다.")
 
-# 카테고리 선택
 categories = [
     "광고회사 PT 수주 현황", 
     "대행사/매체사 매출 동향", 
@@ -1075,7 +1147,6 @@ selected_category = st.radio(
     label_visibility="collapsed"
 )
 
-# 메인 바디 컨테이너
 body_container = st.container(border=True)
 with body_container:
     # 탭 1: PT 수주 현황
@@ -1138,7 +1209,6 @@ with body_container:
         
         col_l, col_r = st.columns(2)
         
-        # [좌측] 대행사 영역
         with col_l:
             st.markdown("##### 주요 광고대행사 전파광고 매출 (Start vs 마감)")
             if not df_agency.empty:
@@ -1241,7 +1311,6 @@ with body_container:
             else:
                 st.info("sales_master.xlsx 파일의 대행사 매출 데이터를 확인 중입니다.")
 
-        # [우측] 방송 매체사 영역
         with col_r:
             st.markdown("##### 방송 매체사 광고 매출 (Start vs 마감)")
             if not df_tv.empty:
