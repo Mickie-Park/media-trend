@@ -166,5 +166,12 @@
         "name": "마스터 관리자",
         "action": "로그인",
         "details": "시스템 로그인 성공"
+    },
+    {
+        "timestamp": "2026-09-21 19:54:11",
+        "username": "admin",
+        "name": "마스터 관리자",
+        "action": "AI 질의",
+        "details": "질문: 널 만든 사람은 누구?..."
     }
 ]
