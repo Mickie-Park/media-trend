@@ -20,10 +20,11 @@ LOG_DB_FILE = "activity_logs.json"
 MASTER_SALES_FILE = "sales_master.xlsx"
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# GitHub API 연동 설정
+# GitHub API 연동 설정 (media-trend)
 GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", None)
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "Mickie-Park/media-trend")
 FILE_PATH = "users.json"
+LOG_FILE_PATH = "activity_logs.json"
 
 # --- 2. CSS 스타일링 ---
 st.markdown("""
@@ -301,6 +302,7 @@ def is_user_approved(val):
         return val == 1
     return False
 
+# 회원 DB 로드
 def load_users():
     default_admin = {
         "admin": {
@@ -339,12 +341,12 @@ def load_users():
     save_users(default_admin)
     return default_admin
 
+# 회원 DB 저장
 def save_users(users_dict):
     with open(USER_DB_FILE, "w", encoding="utf-8") as f:
         json.dump(users_dict, f, ensure_ascii=False, indent=4)
         
     if not GITHUB_TOKEN:
-        st.error("❌ Secrets에 GITHUB_TOKEN이 설정되지 않았습니다.")
         return False
 
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{FILE_PATH}"
@@ -354,9 +356,6 @@ def save_users(users_dict):
         sha = None
         if res.status_code == 200:
             sha = res.json().get("sha")
-        elif res.status_code != 404:
-            st.error(f"❌ GitHub 파일 조회 실패 (상태코드 {res.status_code}): {res.text}")
-            return False
             
         raw_content = json.dumps(users_dict, ensure_ascii=False, indent=4)
         b64_content = base64.b64encode(raw_content.encode("utf-8")).decode("utf-8")
@@ -369,28 +368,40 @@ def save_users(users_dict):
             payload["sha"] = sha
             
         put_res = requests.put(url, headers=headers, json=payload)
-        if put_res.status_code in [200, 201]:
-            st.toast("✅ GitHub 저장 완료!", icon="💾")
-            return True
-        else:
-            st.error(f"❌ GitHub 저장 거절됨 [코드 {put_res.status_code}]: {put_res.json().get('message', put_res.text)}")
-            return False
-    except Exception as e:
-        st.error(f"❌ GitHub 통신 예외 발생: {e}")
+        return put_res.status_code in [200, 201]
+    except Exception:
         return False
 
+# 활동 로그 GitHub 기반 영구 로드
+def load_raw_activity_logs():
+    if GITHUB_TOKEN:
+        url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{LOG_FILE_PATH}"
+        try:
+            res = requests.get(url, headers=get_github_headers())
+            if res.status_code == 200:
+                content = res.json().get("content", "")
+                decoded = base64.b64decode(content).decode("utf-8")
+                logs = json.loads(decoded)
+                with open(LOG_DB_FILE, "w", encoding="utf-8") as f:
+                    json.dump(logs, f, ensure_ascii=False, indent=4)
+                return logs
+        except Exception:
+            pass
+
+    if os.path.exists(LOG_DB_FILE):
+        try:
+            with open(LOG_DB_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+# 활동 로그 GitHub 기반 영구 저장
 def log_activity(username, user_name, action, details=""):
     now = get_now_kst()
     timestamp_str = now.strftime("%Y-%m-%d %H:%M:%S")
     
-    logs = []
-    if os.path.exists(LOG_DB_FILE):
-        try:
-            with open(LOG_DB_FILE, "r", encoding="utf-8") as f:
-                logs = json.load(f)
-        except Exception:
-            logs = []
-            
+    logs = load_raw_activity_logs()
     logs.append({
         "timestamp": timestamp_str,
         "username": username,
@@ -399,21 +410,37 @@ def log_activity(username, user_name, action, details=""):
         "details": details
     })
     
-    if len(logs) > 1000:
-        logs = logs[-1000:]
+    # 최근 1,500건 유지
+    if len(logs) > 1500:
+        logs = logs[-1500:]
         
-    try:
-        with open(LOG_DB_FILE, "w", encoding="utf-8") as f:
-            json.dump(logs, f, ensure_ascii=False, indent=4)
-    except Exception:
-        pass
+    with open(LOG_DB_FILE, "w", encoding="utf-8") as f:
+        json.dump(logs, f, ensure_ascii=False, indent=4)
+
+    # GitHub 리포지토리에 커밋하여 영구 저장
+    if GITHUB_TOKEN:
+        url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{LOG_FILE_PATH}"
+        headers = get_github_headers()
+        try:
+            res = requests.get(url, headers=headers)
+            sha = None
+            if res.status_code == 200:
+                sha = res.json().get("sha")
+            raw_c = json.dumps(logs, ensure_ascii=False, indent=4)
+            b64_c = base64.b64encode(raw_c.encode("utf-8")).decode("utf-8")
+            payload = {
+                "message": f"Audit Log: {action} by {username} [skip ci]",
+                "content": b64_c
+            }
+            if sha:
+                payload["sha"] = sha
+            requests.put(url, headers=headers, json=payload)
+        except Exception:
+            pass
 
 def load_activity_logs():
-    if not os.path.exists(LOG_DB_FILE):
-        return pd.DataFrame(columns=["일시", "아이디", "이름", "활동 구분", "상세 내역"])
-    try:
-        with open(LOG_DB_FILE, "r", encoding="utf-8") as f:
-            logs = json.load(f)
+    logs = load_raw_activity_logs()
+    if logs:
         df_l = pd.DataFrame(logs)
         if not df_l.empty:
             df_l = df_l.rename(columns={
@@ -424,9 +451,7 @@ def load_activity_logs():
                 "details": "상세 내역"
             })
             return df_l.sort_values(by="일시", ascending=False)
-        return pd.DataFrame(columns=["일시", "아이디", "이름", "활동 구분", "상세 내역"])
-    except Exception:
-        return pd.DataFrame(columns=["일시", "아이디", "이름", "활동 구분", "상세 내역"])
+    return pd.DataFrame(columns=["일시", "아이디", "이름", "활동 구분", "상세 내역"])
 
 users_db = load_users()
 
@@ -927,6 +952,14 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
                 st.write("")
                 st.write("")
                 if st.button("감사 로그 전체 초기화", type="secondary"):
+                    if GITHUB_TOKEN:
+                        url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{LOG_FILE_PATH}"
+                        headers = get_github_headers()
+                        res = requests.get(url, headers=headers)
+                        if res.status_code == 200:
+                            sha = res.json().get("sha")
+                            b64_empty = base64.b64encode("[]".encode("utf-8")).decode("utf-8")
+                            requests.put(url, headers=headers, json={"message": "Clear logs", "content": b64_empty, "sha": sha})
                     if os.path.exists(LOG_DB_FILE):
                         os.remove(LOG_DB_FILE)
                     st.rerun()
@@ -937,7 +970,7 @@ if st.session_state["role"] == "admin" and st.session_state.get("admin_view", Fa
             if selected_action != "전체 활동":
                 view_logs = view_logs[view_logs["활동 구분"] == selected_action]
 
-            st.caption(f"조회 로그: **{len(view_logs)}건** / 전체 로그: **{len(df_logs)}건**")
+            st.caption(f"조회 로그: **{len(view_logs)}건** / 누적 로그: **{len(df_logs)}건**")
             st.dataframe(view_logs, use_container_width=True, hide_index=True)
         else:
             st.info("기록된 활동 감사 로그가 없습니다.")
@@ -1281,7 +1314,6 @@ with body_container:
                             df_yoy_tv["월순서"] = df_yoy_tv["월"].apply(month_sort_key)
                             df_yoy_tv = df_yoy_tv.sort_values(by="월순서").drop(columns=["월순서"])
                             
-                            # [오타 수정 완료: yoy_base_year -> yoy_tv_base]
                             df_yoy_tv["증감액(억원)"] = df_yoy_tv[f"{yoy_tv_base}년"] - df_yoy_tv[f"{prev_tv_year}년"]
                             df_yoy_tv["YoY 증감률(%)"] = df_yoy_tv.apply(
                                 lambda r: f"{((r[f'{yoy_tv_base}년'] - r[f'{prev_tv_year}년']) / r[f'{prev_tv_year}년'] * 100):+.1f}%" 
