@@ -131,5 +131,12 @@
         "name": "마스터 관리자",
         "action": "회원 승인",
         "details": "승인: skb3387"
+    },
+    {
+        "timestamp": "2026-09-21 15:59:45",
+        "username": "skb3387",
+        "name": "윤지민",
+        "action": "로그인",
+        "details": "시스템 로그인 성공"
     }
 ]
