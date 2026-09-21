@@ -12,5 +12,12 @@
         "name": "마스터 관리자",
         "action": "로그아웃",
         "details": "총 체류 시간: 8분 51초"
+    },
+    {
+        "timestamp": "2026-09-21 11:12:54",
+        "username": null,
+        "name": null,
+        "action": "로그아웃",
+        "details": "총 체류 시간: 집계 불가"
     }
 ]
