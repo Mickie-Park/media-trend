@@ -46,5 +46,11 @@
         "password": "0ffe1abd1a08215353c233d6e009613e95eec4253832a761af28ff37ac5a150c",
         "role": "member",
         "approved": true
+    },
+    "napor7": {
+        "name": "정진경",
+        "password": "e5cc502692c684f2cdb3ce5e04080651b6c68ae185c00f0a587933634b03f3e3",
+        "role": "member",
+        "approved": false
     }
 }
