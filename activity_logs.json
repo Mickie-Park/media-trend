@@ -40,5 +40,12 @@
         "name": "마스터 관리자",
         "action": "AI 질의",
         "details": "질문: ENA 매출 분석해줘...."
+    },
+    {
+        "timestamp": "2026-09-21 14:21:55",
+        "username": "admin",
+        "name": "마스터 관리자",
+        "action": "AI 질의",
+        "details": "질문: 자동차나 차 관련 업계 동향을 분석해줘...."
     }
 ]
