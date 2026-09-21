@@ -145,5 +145,12 @@
         "name": "윤지민",
         "action": "AI 질의",
         "details": "질문: 만든사람..."
+    },
+    {
+        "timestamp": "2026-09-21 17:16:54",
+        "username": "napor7",
+        "name": "정진경",
+        "action": "회원가입 신청",
+        "details": "아이디 'napor7' 가입 신청"
     }
 ]
