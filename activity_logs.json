@@ -117,5 +117,12 @@
         "name": "윤지민",
         "action": "회원가입 신청",
         "details": "아이디 'skb3387' 가입 신청"
+    },
+    {
+        "timestamp": "2026-09-21 15:57:20",
+        "username": "admin",
+        "name": "마스터 관리자",
+        "action": "로그인",
+        "details": "시스템 로그인 성공"
     }
 ]
