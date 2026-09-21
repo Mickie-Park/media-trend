@@ -39,6 +39,6 @@
         "name": "최승호",
         "password": "639c1115ab55d139a527f7bb3c1a9570bb60cf96f5c13bdaa41a7264a74e748f",
         "role": "member",
-        "approved": false
+        "approved": true
     }
 }
