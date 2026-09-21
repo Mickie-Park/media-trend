@@ -138,5 +138,12 @@
         "name": "윤지민",
         "action": "로그인",
         "details": "시스템 로그인 성공"
+    },
+    {
+        "timestamp": "2026-09-21 16:01:03",
+        "username": "skb3387",
+        "name": "윤지민",
+        "action": "AI 질의",
+        "details": "질문: 만든사람..."
     }
 ]
