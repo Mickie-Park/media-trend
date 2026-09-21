@@ -34,5 +34,11 @@
         "password": "37c23345fa0425f0737427f61db3ccc6a0788e03af2e5d49aa4c22dbb0807b86",
         "role": "member",
         "approved": true
+    },
+    "98csh": {
+        "name": "최승호",
+        "password": "639c1115ab55d139a527f7bb3c1a9570bb60cf96f5c13bdaa41a7264a74e748f",
+        "role": "member",
+        "approved": false
     }
 }
