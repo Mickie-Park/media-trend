@@ -124,5 +124,12 @@
         "name": "마스터 관리자",
         "action": "로그인",
         "details": "시스템 로그인 성공"
+    },
+    {
+        "timestamp": "2026-09-21 15:57:29",
+        "username": "admin",
+        "name": "마스터 관리자",
+        "action": "회원 승인",
+        "details": "승인: skb3387"
     }
 ]
