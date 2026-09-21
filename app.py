@@ -1198,7 +1198,7 @@ with body_container:
     # 탭 2: 매출 동향
     elif selected_category == "대행사/매체사 매출 동향":
         st.markdown("<h3 style='font-size: 1.20rem; font-weight: 700; color: #0F172A; margin-bottom: 2px;'>광고대행사 및 방송 매체사 매출 추이 & YoY 분석</h3>", unsafe_allow_html=True)
-        st.caption("sales_master.xlsx 마스터 시트와 100% 동기화된 정밀 매출(Start vs 마감) 통계입니다.")
+        st.caption("마스터 시트와 100% 동기화된 정밀 매출(Start/마감) 통계입니다_※공중파, 종편, CATV매출이며 디지털, 옥외, IPTV 등은 미포함.")
         st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
         
         view_mode = st.radio(
