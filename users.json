@@ -51,6 +51,6 @@
         "name": "정진경",
         "password": "e5cc502692c684f2cdb3ce5e04080651b6c68ae185c00f0a587933634b03f3e3",
         "role": "member",
-        "approved": false
+        "approved": true
     }
 }
