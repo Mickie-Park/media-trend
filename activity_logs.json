@@ -180,5 +180,12 @@
         "name": "마스터 관리자",
         "action": "로그인",
         "details": "시스템 로그인 성공"
+    },
+    {
+        "timestamp": "2026-09-22 09:28:19",
+        "username": "admin",
+        "name": "마스터 관리자",
+        "action": "로그인",
+        "details": "시스템 로그인 성공"
     }
 ]
