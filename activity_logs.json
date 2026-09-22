@@ -194,5 +194,12 @@
         "name": "정진경",
         "action": "로그인",
         "details": "시스템 로그인 성공"
+    },
+    {
+        "timestamp": "2026-09-22 11:33:23",
+        "username": "admin",
+        "name": "마스터 관리자",
+        "action": "로그아웃",
+        "details": "총 체류 시간: 125분 3초"
     }
 ]
