@@ -201,5 +201,12 @@
         "name": "마스터 관리자",
         "action": "로그아웃",
         "details": "총 체류 시간: 125분 3초"
+    },
+    {
+        "timestamp": "2026-09-22 11:33:43",
+        "username": "usert",
+        "name": "유저티",
+        "action": "로그인",
+        "details": "시스템 로그인 성공"
     }
 ]
