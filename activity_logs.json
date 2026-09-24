@@ -208,5 +208,12 @@
         "name": "유저티",
         "action": "로그인",
         "details": "시스템 로그인 성공"
+    },
+    {
+        "timestamp": "2026-09-24 20:41:28",
+        "username": "admin",
+        "name": "마스터 관리자",
+        "action": "로그인",
+        "details": "시스템 로그인 성공"
     }
 ]
