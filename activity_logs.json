@@ -222,5 +222,12 @@
         "name": "마스터 관리자",
         "action": "로그아웃",
         "details": "총 체류 시간: 0분 41초"
+    },
+    {
+        "timestamp": "2026-09-28 08:14:51",
+        "username": "jjabbani",
+        "name": "최경희",
+        "action": "회원가입 신청",
+        "details": "아이디 'jjabbani' 가입 신청"
     }
 ]
