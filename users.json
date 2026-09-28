@@ -57,6 +57,6 @@
         "name": "최경희",
         "password": "2981b4cd4fa94a181ebb53d625e8a5c380add9223fceb71c8b2fbbdab29190a8",
         "role": "member",
-        "approved": false
+        "approved": true
     }
 }
