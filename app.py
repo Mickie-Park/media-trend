@@ -273,7 +273,7 @@ st.markdown("""
         background: transparent !important;
     }
 
-    /* 사이드바 st.expander 흰색 박스 현상 해결 */
+    /* 사이드바 st.expander 스타일 */
     [data-testid="stSidebar"] [data-testid="stExpander"] {
         background-color: #13213B !important;
         border: 1px solid #243656 !important;
@@ -299,6 +299,16 @@ st.markdown("""
         color: #F8FAFC !important;
         font-size: 0.84rem !important;
     }
+
+    /* 사이드바 인라인 코드(code) 배경 및 글자색 보정 (흰색 박스 방지) */
+    [data-testid="stSidebar"] code {
+        background-color: #1E2E4A !important;
+        color: #93C5FD !important;
+        border: 1px solid #2D4165 !important;
+        border-radius: 4px !important;
+        padding: 1px 5px !important;
+    }
+
     [data-testid="stSidebar"] input {
         background-color: #0C1A30 !important;
         border: 1px solid #2D4165 !important;
@@ -914,25 +924,22 @@ if st.session_state["role"] == "admin":
     current_users_sb = load_users()
     pending_sb = {uid: info for uid, info in current_users_sb.items() if not is_user_approved(info.get("approved", False))}
     
-    # [수정] 헤더 스타일 정상화 및 승인/반려 가로 정렬
+    # [수정: 백틱 제거하여 흰색 박스 없이 텍스트로 깔끔하게 렌더링]
     with st.sidebar.expander(f"빠른 회원 승인 ({len(pending_sb)}건 대기)", expanded=bool(pending_sb)):
         if pending_sb:
             for uid, info in pending_sb.items():
-                st.markdown(f"**{info.get('name', uid)}** (`{uid}`)")
-                sc_btn1, sc_btn2 = st.columns([1, 1])
-                with sc_btn1:
-                    if st.button("승인", key=f"sb_app_{uid}", type="primary", use_container_width=True):
-                        current_users_sb[uid]["approved"] = True
-                        save_users(current_users_sb)
-                        log_activity(st.session_state["username"], st.session_state["user_name"], "회원 승인", f"승인: {uid}")
-                        st.rerun()
-                with sc_btn2:
-                    if st.button("반려", key=f"sb_del_{uid}", use_container_width=True):
-                        del current_users_sb[uid]
-                        save_users(current_users_sb)
-                        log_activity(st.session_state["username"], st.session_state["user_name"], "회원 반려", f"반려: {uid}")
-                        st.rerun()
-                st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
+                st.markdown(f"**{info.get('name', uid)}** ({uid})")
+                sc_btn1, sc_btn2 = st.columns(2)
+                if sc_btn1.button("승인", key=f"sb_app_{uid}", type="primary"):
+                    current_users_sb[uid]["approved"] = True
+                    save_users(current_users_sb)
+                    log_activity(st.session_state["username"], st.session_state["user_name"], "회원 승인", f"승인: {uid}")
+                    st.rerun()
+                if sc_btn2.button("반려", key=f"sb_del_{uid}"):
+                    del current_users_sb[uid]
+                    save_users(current_users_sb)
+                    log_activity(st.session_state["username"], st.session_state["user_name"], "회원 반려", f"반려: {uid}")
+                    st.rerun()
         else:
             st.caption("현재 승인 대기자가 없습니다.")
 
