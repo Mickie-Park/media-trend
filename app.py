@@ -26,6 +26,27 @@ GITHUB_REPO = st.secrets.get("GITHUB_REPO", "Mickie-Park/media-trend")
 FILE_PATH = "users.json"
 LOG_FILE_PATH = "activity_logs.json"
 
+# 텔레그램 알림 설정
+TELEGRAM_BOT_TOKEN = st.secrets.get("TELEGRAM_BOT_TOKEN", None)
+TELEGRAM_CHAT_ID = st.secrets.get("TELEGRAM_CHAT_ID", None)
+
+def send_telegram_alert(name, user_id):
+    """신규 회원가입 승인 요청 시 관리자 텔레그램으로 실시간 푸시 전송"""
+    if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+        now_str = get_now_kst().strftime("%Y-%m-%d %H:%M:%S")
+        msg = (
+            f"🔔 [월간 미디어 동향] 신규 회원가입 승인 요청\n"
+            f"• 이름: {name}\n"
+            f"• 아이디: {user_id}\n"
+            f"• 신청일시: {now_str}\n\n"
+            f"👉 관리자 콘솔에서 가입 승인을 진행해 주세요."
+        )
+        try:
+            url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+            requests.post(url, data={"chat_id": TELEGRAM_CHAT_ID, "text": msg}, timeout=5)
+        except Exception:
+            pass
+
 # --- 2. CSS 스타일링 ---
 st.markdown("""
 <style>
@@ -539,9 +560,10 @@ if not st.session_state["logged_in"]:
                     }
                     save_users(users_current)
                     log_activity(new_id, new_name, "회원가입 신청", f"아이디 '{new_id}' 가입 신청")
+                    # 텔레그램 관리자 알림 전송
+                    send_telegram_alert(new_name, new_id)
                     st.success("회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인하실 수 있습니다.")
     
-    # 미로그인 시 본문 100% 원천 차단
     st.stop()
 
 # =========================================================================
@@ -1198,7 +1220,7 @@ with body_container:
     # 탭 2: 매출 동향
     elif selected_category == "대행사/매체사 매출 동향":
         st.markdown("<h3 style='font-size: 1.20rem; font-weight: 700; color: #0F172A; margin-bottom: 2px;'>광고대행사 및 방송 매체사 매출 추이 & YoY 분석</h3>", unsafe_allow_html=True)
-        st.caption("마스터 시트와 100% 동기화된 정밀 매출(Start/마감) 통계입니다_※공중파, 종편, CATV매출이며 디지털, 옥외, IPTV 등은 미포함.")
+        st.caption("sales_master.xlsx 마스터 시트와 100% 동기화된 정밀 매출(Start vs 마감) 통계입니다.")
         st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
         
         view_mode = st.radio(
