@@ -264,5 +264,12 @@
         "name": "유저티투",
         "action": "회원가입 신청",
         "details": "아이디 'usert2' 가입 신청"
+    },
+    {
+        "timestamp": "2026-09-29 10:26:10",
+        "username": "admin",
+        "name": "마스터 관리자",
+        "action": "로그인",
+        "details": "시스템 로그인 성공"
     }
 ]
