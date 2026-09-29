@@ -273,10 +273,27 @@ st.markdown("""
         background: transparent !important;
     }
 
+    /* 사이드바 st.expander 흰색 박스 현상 해결 */
     [data-testid="stSidebar"] [data-testid="stExpander"] {
         background-color: #13213B !important;
         border: 1px solid #243656 !important;
-        border-radius: 5px !important;
+        border-radius: 6px !important;
+        overflow: hidden !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stExpander"] summary {
+        background-color: #13213B !important;
+        color: #F8FAFC !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stExpander"] summary:hover {
+        background-color: #1A2C4E !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stExpander"] summary svg {
+        fill: #93C5FD !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stExpanderDetails"] {
+        background-color: #0E1A2E !important;
+        border-top: 1px solid #243656 !important;
+        padding: 12px !important;
     }
     [data-testid="stSidebar"] [data-testid="stExpander"] * {
         color: #F8FAFC !important;
@@ -560,7 +577,6 @@ if not st.session_state["logged_in"]:
                     }
                     save_users(users_current)
                     log_activity(new_id, new_name, "회원가입 신청", f"아이디 '{new_id}' 가입 신청")
-                    # 텔레그램 관리자 알림 전송
                     send_telegram_alert(new_name, new_id)
                     st.success("회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인하실 수 있습니다.")
     
@@ -897,21 +913,26 @@ if st.session_state["role"] == "admin":
             
     current_users_sb = load_users()
     pending_sb = {uid: info for uid, info in current_users_sb.items() if not is_user_approved(info.get("approved", False))}
+    
+    # [수정] 헤더 스타일 정상화 및 승인/반려 가로 정렬
     with st.sidebar.expander(f"빠른 회원 승인 ({len(pending_sb)}건 대기)", expanded=bool(pending_sb)):
         if pending_sb:
             for uid, info in pending_sb.items():
-                st.write(f"**{info.get('name', uid)}** (`{uid}`)")
-                sc_btn1, sc_btn2 = st.columns(2)
-                if sc_btn1.button("승인", key=f"sb_app_{uid}", type="primary"):
-                    current_users_sb[uid]["approved"] = True
-                    save_users(current_users_sb)
-                    log_activity(st.session_state["username"], st.session_state["user_name"], "회원 승인", f"승인: {uid}")
-                    st.rerun()
-                if sc_btn2.button("반려", key=f"sb_del_{uid}"):
-                    del current_users_sb[uid]
-                    save_users(current_users_sb)
-                    log_activity(st.session_state["username"], st.session_state["user_name"], "회원 반려", f"반려: {uid}")
-                    st.rerun()
+                st.markdown(f"**{info.get('name', uid)}** (`{uid}`)")
+                sc_btn1, sc_btn2 = st.columns([1, 1])
+                with sc_btn1:
+                    if st.button("승인", key=f"sb_app_{uid}", type="primary", use_container_width=True):
+                        current_users_sb[uid]["approved"] = True
+                        save_users(current_users_sb)
+                        log_activity(st.session_state["username"], st.session_state["user_name"], "회원 승인", f"승인: {uid}")
+                        st.rerun()
+                with sc_btn2:
+                    if st.button("반려", key=f"sb_del_{uid}", use_container_width=True):
+                        del current_users_sb[uid]
+                        save_users(current_users_sb)
+                        log_activity(st.session_state["username"], st.session_state["user_name"], "회원 반려", f"반려: {uid}")
+                        st.rerun()
+                st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
         else:
             st.caption("현재 승인 대기자가 없습니다.")
 
