@@ -257,5 +257,12 @@
         "name": "마스터 관리자",
         "action": "로그아웃",
         "details": "총 체류 시간: 23분 19초"
+    },
+    {
+        "timestamp": "2026-09-29 10:24:35",
+        "username": "usert2",
+        "name": "유저티투",
+        "action": "회원가입 신청",
+        "details": "아이디 'usert2' 가입 신청"
     }
 ]
