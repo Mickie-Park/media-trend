@@ -243,5 +243,12 @@
         "name": "마스터 관리자",
         "action": "회원 승인",
         "details": "승인: jjabbani"
+    },
+    {
+        "timestamp": "2026-09-29 09:07:06",
+        "username": "admin",
+        "name": "마스터 관리자",
+        "action": "AI 질의",
+        "details": "질문: 자동차, 차 관련 광고 동향은?..."
     }
 ]
