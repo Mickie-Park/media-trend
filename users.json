@@ -58,11 +58,5 @@
         "password": "2981b4cd4fa94a181ebb53d625e8a5c380add9223fceb71c8b2fbbdab29190a8",
         "role": "member",
         "approved": true
-    },
-    "usert2": {
-        "name": "유저티투",
-        "password": "8baef370020e10b5964c40f74f6f0ad7feeacfbec651098d389f936e8d1da033",
-        "role": "member",
-        "approved": true
     }
 }
