@@ -292,5 +292,12 @@
         "name": "마스터 관리자",
         "action": "승인 취소",
         "details": "대기 전환: usert2"
+    },
+    {
+        "timestamp": "2026-09-30 09:06:06",
+        "username": "admin",
+        "name": "마스터 관리자",
+        "action": "로그인",
+        "details": "시스템 로그인 성공"
     }
 ]
