@@ -313,5 +313,12 @@
         "name": "마스터 관리자",
         "action": "회원 삭제",
         "details": "삭제: usert2"
+    },
+    {
+        "timestamp": "2026-09-30 13:43:24",
+        "username": "jjabbani",
+        "name": "최경희",
+        "action": "로그인",
+        "details": "시스템 로그인 성공"
     }
 ]
