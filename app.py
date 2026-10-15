@@ -47,7 +47,7 @@ def send_telegram_alert(name, user_id):
         except Exception:
             pass
 
-# --- 2. CSS 스타일링 (단일 라인 최적화) ---
+# --- 2. CSS 스타일링 ---
 st.markdown("""
 <style>
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
@@ -295,9 +295,9 @@ if not st.session_state["logged_in"]:
                     st.success("회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인하실 수 있습니다.")
     st.stop()
 
-# --- 5. 데이터 로드 ---
+# --- 5. 데이터 로드 (v2.1: ▲ 기호 및 1행/줄바꿈 완벽 대응) ---
 @st.cache_data(show_spinner=False)
-def load_all_data():
+def load_all_data(cache_ver="v2.1"):
     raw_files = glob.glob("**/*.[xX][lL][sS][xX]", recursive=True)
     monthly_report_files = []
     for f in raw_files:
@@ -320,35 +320,61 @@ def load_all_data():
         v = str(val).strip()
         return "" if v.lower() in ["nan", "none", "-"] else v
 
+    PRIMARY_HEAD_SYMS = ("▲", "△", "★", "☆", "■", "□", "▶", "▷", "◆", "◇", "●", "○", "◈", "▣", "☞")
+
     for f in monthly_report_files:
         m = re.search(r'(\d{4})(\d{2})', f)
         ym = f"{m.group(1)}-{m.group(2)}" if m else "기타"
         year_str = m.group(1) if m else "기타"
         try:
             xls = pd.ExcelFile(f)
-            df = pd.read_excel(f, sheet_name=xls.sheet_names[0])
+            # header=None 으로 지정하여 엑셀 1행 데이터가 컬럼명으로 유실되는 현상 원천 차단
+            df = pd.read_excel(f, sheet_name=xls.sheet_names[0], header=None)
             
-            # 이슈 파싱 ('* 및 다양한 기호 지원)
-            current_issue = ""
+            # 1) PT 테이블 시작 전까지 모든 이슈 텍스트 줄(셀 내 줄바꿈 포함) 수집
+            raw_issue_lines = []
             for r_idx in range(len(df)):
-                row_vals = [clean_str(df.iloc[r_idx, c]) for c in range(min(3, len(df.columns)))]
-                text = " ".join([v for v in row_vals if v]).strip()
-                if not text:
+                row_vals = [clean_str(df.iloc[r_idx, c]) for c in range(min(4, len(df.columns)))]
+                row_joined = " ".join([v for v in row_vals if v]).strip()
+                if not row_joined:
                     continue
-                if "광고회사 PT" in text or ("PT일자" in text and "광고주" in text):
+                row_nospace = row_joined.replace(" ", "")
+                
+                # PT 테이블 헤더나 매출 테이블 시작 시 종료
+                if ("PT일자" in row_nospace and "광고주" in row_nospace) or "전파광고매출" in row_nospace:
                     break
-                clean_text = text.lstrip("'\":").strip()
-                if not clean_text:
-                    continue
+                if "광고회사PT" in row_nospace and len(row_nospace) < 25:
+                    break
 
+                # 셀 내부에 Alt+Enter(\n)로 여러 줄이 입력된 경우 한 줄씩 분리
+                for raw_line in row_joined.splitlines():
+                    clean_t = re.sub(r"^[\s'\"`\xa0\u200b]+", "", raw_line).strip()
+                    if not clean_t:
+                        continue
+                    t_nospace = clean_t.replace(" ", "")
+                    if "광고회사PT" in t_nospace and len(t_nospace) < 25:
+                        break
+                    # 단순 문서 타이틀(예: "주요 이슈", "업계 동향", "1. 주요 이슈") 건너뛰기
+                    if t_nospace in ["주요이슈", "업계동향", "1.주요이슈", "*주요이슈", "■주요이슈", "▲주요이슈", "[주요이슈]"]:
+                        continue
+                    raw_issue_lines.append(clean_t)
+
+            # 해당 파일에 ▲, ★ 등 주요 기호가 쓰였는지 확인 (쓰이지 않은 2023-07 등에서는 *를 헤드라인으로 취급)
+            has_primary = any(ln.startswith(PRIMARY_HEAD_SYMS) for ln in raw_issue_lines)
+            active_head_syms = PRIMARY_HEAD_SYMS if has_primary else PRIMARY_HEAD_SYMS + ("*",)
+
+            current_issue = ""
+            for clean_text in raw_issue_lines:
                 is_headline = False
                 headline_text = ""
-                for sym in ["*", "★", "■", "▶", "◆", "●"]:
+                for sym in active_head_syms:
                     if clean_text.startswith(sym):
                         is_headline = True
                         headline_text = clean_text.lstrip(sym).strip()
+                        headline_text = re.sub(r"^[\s'\"`]+", "", headline_text).strip()
                         break
-                if not is_headline:
+                        
+                if not is_headline and not has_primary:
                     num_match = re.match(r'^(\d+[\.\)]\s*)(.+)', clean_text)
                     if num_match and len(clean_text) > 5 and not any(k in clean_text for k in ["PT일자", "빌링", "광고주", "단위"]):
                         is_headline = True
@@ -358,14 +384,11 @@ def load_all_data():
                     current_issue = headline_text
                     issues_list.append({"연월": ym, "헤드라인": current_issue, "상세": ""})
                 elif current_issue:
-                    for sub_sym in ["-", "·", "•", "ㅇ", "*", "↳"]:
-                        if clean_text.startswith(sub_sym):
-                            sub_text = clean_text.lstrip(sub_sym).strip()
-                            if sub_text:
-                                issues_list.append({"연월": ym, "헤드라인": current_issue, "상세": sub_text})
-                            break
+                    sub_text = re.sub(r"^[\-\–\—\―\·\•\ㅇ\*\↳\※\>\→\➔\s'\"]+", "", clean_text).strip()
+                    if sub_text:
+                        issues_list.append({"연월": ym, "헤드라인": current_issue, "상세": sub_text})
             
-            # 경쟁 PT 파싱
+            # 2) 경쟁 PT 파싱
             for p_idx in range(len(df)):
                 row_cells = [clean_str(x) for x in df.iloc[p_idx].tolist()]
                 row_text_no_space = "".join(row_cells).replace(" ", "")
@@ -474,7 +497,7 @@ def load_all_data():
 
     return pd.DataFrame(issues_list), df_tv, pd.DataFrame(pt_list), df_agency, monthly_report_files
 
-df_issues, df_tv, df_pt, df_agency, loaded_files = load_all_data()
+df_issues, df_tv, df_pt, df_agency, loaded_files = load_all_data("v2.1")
 
 def normalize_match_key(text):
     return re.sub(r'[\s\(\)\[\]_\-.,·/]', '', str(text)).lower() if text else ""
