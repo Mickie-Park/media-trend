@@ -457,3 +457,321 @@ def log_activity(username, user_name, action, details=""):
         "name": str(user_name) if user_name else "unknown",
         "action": str(action),
         "details": str(details)
+    })
+    
+    if len(logs) > 1500:
+        logs = logs[-1500:]
+        
+    with open(LOG_DB_FILE, "w", encoding="utf-8") as f:
+        json.dump(logs, f, ensure_ascii=False, indent=4)
+
+    if GITHUB_TOKEN:
+        url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{LOG_FILE_PATH}"
+        headers = get_github_headers()
+        try:
+            res = requests.get(url, headers=headers)
+            sha = None
+            if res.status_code == 200:
+                sha = res.json().get("sha")
+            raw_c = json.dumps(logs, ensure_ascii=False, indent=4)
+            b64_c = base64.b64encode(raw_c.encode("utf-8")).decode("utf-8")
+            payload = {
+                "message": f"Audit Log: {action} by {username} [skip ci]",
+                "content": b64_c
+            }
+            if sha:
+                payload["sha"] = sha
+            requests.put(url, headers=headers, json=payload)
+        except Exception:
+            pass
+
+def load_activity_logs():
+    logs = load_raw_activity_logs()
+    if logs:
+        df_l = pd.DataFrame(logs)
+        if not df_l.empty:
+            df_l = df_l.rename(columns={
+                "timestamp": "일시",
+                "username": "아이디",
+                "name": "이름",
+                "action": "활동 구분",
+                "details": "상세 내역"
+            })
+            return df_l.sort_values(by="일시", ascending=False)
+    return pd.DataFrame(columns=["일시", "아이디", "이름", "활동 구분", "상세 내역"])
+
+users_db = load_users()
+
+# 세션 상태 초기화
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
+    st.session_state["username"] = None
+    st.session_state["role"] = None
+    st.session_state["user_name"] = None
+    st.session_state["login_time"] = None
+    st.session_state["admin_view"] = False
+
+# URL 파라미터 자동 로그인 체크
+auth_token = st.query_params.get("user", None)
+if auth_token and not st.session_state["logged_in"]:
+    users_current = load_users()
+    if auth_token in users_current and is_user_approved(users_current[auth_token].get("approved", False)):
+        st.session_state["logged_in"] = True
+        st.session_state["username"] = auth_token
+        st.session_state["role"] = users_current[auth_token].get("role", "member")
+        st.session_state["user_name"] = users_current[auth_token].get("name", auth_token)
+        st.session_state["login_time"] = get_now_kst()
+
+# =========================================================================
+# 4. [로그인 화면 및 권한 게이트] 미로그인 시 본문 100% 원천 차단
+# =========================================================================
+if not st.session_state["logged_in"]:
+    st.markdown("""
+    <div style="padding: 20px 0 16px 0; border-bottom: 2px solid #1E3A8A; margin-bottom: 18px;">
+        <span style="font-size: 0.70rem; font-weight: 700; letter-spacing: 0.08em; color: #B45309; background: #FEF3C7; padding: 3px 8px; border-radius: 4px; border: 1px solid #FDE68A;">INTERNAL ACCESS ONLY</span>
+        <h1 style="font-size: 1.50rem; font-weight: 700; color: #0F172A; margin: 8px 0 4px 0; letter-spacing: -0.02em;">월간 미디어·광고 인텔리전스 리포트</h1>
+        <p style="font-size: 0.85rem; color: #64748B; margin: 0;">사내 인가된 임직원 전용 시스템입니다. 등록된 계정으로 로그인해 주세요.</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    login_tab, signup_tab = st.tabs(["로그인", "회원가입 신청"])
+    
+    with login_tab:
+        with st.form("login_form"):
+            login_id = st.text_input("아이디").strip()
+            login_pw = st.text_input("비밀번호", type="password")
+            submit_login = st.form_submit_button("로그인", type="primary")
+            
+            if submit_login:
+                users_current = load_users()
+                if login_id in users_current:
+                    user_info = users_current[login_id]
+                    if user_info["password"] == hash_password(login_pw):
+                        if is_user_approved(user_info.get("approved", False)):
+                            st.session_state["logged_in"] = True
+                            st.session_state["username"] = login_id
+                            st.session_state["role"] = user_info.get("role", "member")
+                            st.session_state["user_name"] = user_info.get("name", login_id)
+                            st.session_state["login_time"] = get_now_kst()
+                            st.query_params["user"] = login_id
+                            log_activity(login_id, st.session_state["user_name"], "로그인", "시스템 로그인 성공")
+                            st.rerun()
+                        else:
+                            st.warning("관리자 승인 대기 중입니다. 관리자의 승인 완료 후 이용하실 수 있습니다.")
+                    else:
+                        st.error("비밀번호가 올바르지 않습니다.")
+                else:
+                    st.error("등록되지 않은 사용자 아이디입니다.")
+
+    with signup_tab:
+        with st.form("signup_form"):
+            new_id = st.text_input("희망 아이디 (영문/숫자)").strip()
+            new_name = st.text_input("이름 (실명 입력)")
+            new_pw = st.text_input("비밀번호", type="password")
+            new_pw_confirm = st.text_input("비밀번호 확인", type="password")
+            submit_signup = st.form_submit_button("가입 신청하기")
+            
+            if submit_signup:
+                users_current = load_users()
+                if not new_id or not new_name or not new_pw:
+                    st.error("모든 항목을 입력해 주세요.")
+                elif new_id in users_current:
+                    st.error("이미 사용 중인 아이디입니다. 다른 아이디를 입력해 주세요.")
+                elif new_pw != new_pw_confirm:
+                    st.error("비밀번호 확인이 일치하지 않습니다.")
+                else:
+                    users_current[new_id] = {
+                        "name": new_name,
+                        "password": hash_password(new_pw),
+                        "role": "member",
+                        "approved": False
+                    }
+                    save_users(users_current)
+                    log_activity(new_id, new_name, "회원가입 신청", f"아이디 '{new_id}' 가입 신청")
+                    send_telegram_alert(new_name, new_id)
+                    st.success("회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인하실 수 있습니다.")
+    
+    st.stop()
+
+# =========================================================================
+# 5. [인증 완료 사용자 전용] 데이터 로드 및 사이드바 제어판
+# =========================================================================
+
+@st.cache_data(show_spinner=False)
+def load_all_data():
+    raw_files = glob.glob("**/*.[xX][lL][sS][xX]", recursive=True)
+    monthly_report_files = []
+    for f in raw_files:
+        filename = os.path.basename(f)
+        if filename.startswith("~$") or "sales_master" in filename:
+            continue
+        if "업계동향" in filename or "data" in f.lower():
+            monthly_report_files.append(f)
+            
+    def get_file_ym_score(filepath):
+        m = re.search(r'(\d{4})(\d{2})', filepath)
+        return int(m.group(1) + m.group(2)) if m else 0
+        
+    monthly_report_files = sorted(list(set(monthly_report_files)), key=get_file_ym_score, reverse=True)
+    
+    issues_list = []
+    pt_list = []
+
+    def clean_str(val):
+        if pd.isna(val): return ""
+        v = str(val).strip()
+        if v.lower() in ["nan", "none", "-"]: return ""
+        return v
+
+    for f in monthly_report_files:
+        m = re.search(r'(\d{4})(\d{2})', f)
+        ym = f"{m.group(1)}-{m.group(2)}" if m else "기타"
+        year_str = m.group(1) if m else "기타"
+        
+        try:
+            xls = pd.ExcelFile(f)
+            df = pd.read_excel(f, sheet_name=xls.sheet_names[0])
+            
+            # --- 이슈 파싱 ---
+            current_issue = ""
+            for r_idx in range(len(df)):
+                row_vals = [clean_str(df.iloc[r_idx, c]) for c in range(min(3, len(df.columns)))]
+                text = " ".join([v for v in row_vals if v]).strip()
+                
+                if not text:
+                    continue
+                    
+                if "광고회사 PT" in text or ("PT일자" in text and "광고주" in text):
+                    break
+
+                clean_text = text.lstrip("'\":").strip()
+                if not clean_text:
+                    continue
+
+                is_headline = False
+                headline_text = ""
+                for sym in ["*", "★", "■", "▶", "◆", "●"]:
+                    if clean_text.startswith(sym):
+                        is_headline = True
+                        headline_text = clean_text.lstrip(sym).strip()
+                        break
+                        
+                if not is_headline:
+                    num_match = re.match(r'^(\d+[\.\)]\s*)(.+)', clean_text)
+                    if num_match and len(clean_text) > 5 and not any(k in clean_text for k in ["PT일자", "빌링", "광고주", "단위"]):
+                        is_headline = True
+                        headline_text = num_match.group(2).strip()
+
+                if is_headline and headline_text:
+                    current_issue = headline_text
+                    issues_list.append({"연월": ym, "헤드라인": current_issue, "상세": ""})
+                elif current_issue:
+                    is_sub = False
+                    sub_text = ""
+                    for sub_sym in ["-", "·", "•", "ㅇ", "*", "↳"]:
+                        if clean_text.startswith(sub_sym):
+                            is_sub = True
+                            sub_text = clean_text.lstrip(sub_sym).strip()
+                            break
+                    if is_sub and sub_text:
+                        issues_list.append({"연월": ym, "헤드라인": current_issue, "상세": sub_text})
+            
+            # --- 경쟁 PT 파싱 ---
+            for p_idx in range(len(df)):
+                row_cells = [clean_str(x) for x in df.iloc[p_idx].tolist()]
+                row_text_no_space = "".join(row_cells).replace(" ", "")
+                
+                if "PT일자" in row_text_no_space and "광고주" in row_text_no_space:
+                    col_map = {
+                        "date": 0, "client": 1, "product": 2, "billing": 3,
+                        "participants": 4, "incumbent": 6, "winner": 7, "memo": 8
+                    }
+                    
+                    for c_i, c_val in enumerate(row_cells):
+                        c_clean = c_val.replace(" ", "").replace("\n", "")
+                        if "일자" in c_clean: col_map["date"] = c_i
+                        elif "광고주" in c_clean: col_map["client"] = c_i
+                        elif "품목" in c_clean or "과제" in c_clean: col_map["product"] = c_i
+                        elif "빌링" in c_clean or "규모" in c_clean: col_map["billing"] = c_i
+                        elif "참여사" in c_clean or "참여" in c_clean: col_map["participants"] = c_i
+                        elif "기존사" in c_clean or "기존" in c_clean: col_map["incumbent"] = c_i
+                        elif "선정사" in c_clean or "결과" in c_clean: col_map["winner"] = c_i
+                        elif "비고" in c_clean or "메모" in c_clean: col_map["memo"] = c_i
+
+                    for r_i in range(p_idx + 1, len(df)):
+                        sub_row = df.iloc[r_i].tolist()
+                        row_full_str = " ".join([clean_str(x) for x in sub_row])
+                        row_full_nospace = row_full_str.replace(" ", "")
+                        
+                        if any(stop_kw in row_full_nospace for stop_kw in ["전파", "지상파", "종편", "방송사매출", "매출_", "공중파"]):
+                            break
+                        if "PT일자" in row_full_nospace and "광고주" in row_full_nospace:
+                            break
+                        
+                        client_val = clean_str(sub_row[col_map["client"]]) if col_map["client"] < len(sub_row) else ""
+                        date_cell = sub_row[col_map["date"]] if col_map["date"] < len(sub_row) else ""
+                        
+                        if not client_val or client_val in ["광고주", "합계", "소계", "Total", "SUM"]:
+                            continue
+                        if any(junk_kw in client_val for junk_kw in ["광고회사", "종합편", "단위", "합산", "계수", "WPP Media", "Group M"]):
+                            continue
+
+                        date_str = ""
+                        if pd.notna(date_cell):
+                            if isinstance(date_cell, (datetime, pd.Timestamp)):
+                                date_str = date_cell.strftime("%Y-%m-%d")
+                            else:
+                                date_str = clean_str(date_cell)
+                                if len(date_str) >= 10 and date_str[:10].replace("-", "").isdigit():
+                                    date_str = date_str[:10]
+
+                        if not date_str or date_str.isdigit() or any(k in date_str for k in ["SUM", "단위", "WPP"]):
+                            continue
+
+                        excluded_agencies = ["TBWA", "SM C&C", "HS AD", "차이커뮤니케이션", "제일기획", "이노션", "대홍기획", "Dentsu", "덴츠"]
+                        if any(ag in date_str for ag in excluded_agencies) or any(ag in client_val for ag in excluded_agencies):
+                            continue
+
+                        pt_year = year_str
+                        ymatch = re.search(r'(\d{4})', date_str)
+                        if ymatch:
+                            pt_year = ymatch.group(1)
+
+                        billing_raw = clean_str(sub_row[col_map["billing"]]) if col_map["billing"] < len(sub_row) else ""
+                        billing_val = 0.0
+                        b_match = re.search(r'(\d+)', billing_raw)
+                        if b_match:
+                            try:
+                                billing_val = float(b_match.group(1))
+                            except:
+                                pass
+
+                        product_val = clean_str(sub_row[col_map["product"]]) if col_map["product"] < len(sub_row) else ""
+                        participants_val = clean_str(sub_row[col_map["participants"]]) if col_map["participants"] < len(sub_row) else ""
+                        incumbent_val = clean_str(sub_row[col_map["incumbent"]]) if col_map["incumbent"] < len(sub_row) else ""
+                        winner_val = clean_str(sub_row[col_map["winner"]]) if col_map["winner"] < len(sub_row) else ""
+                        memo_val = clean_str(sub_row[col_map["memo"]]) if col_map["memo"] < len(sub_row) else ""
+
+                        pt_list.append({
+                            "발행연월": ym,
+                            "연도": pt_year,
+                            "PT일자": date_str,
+                            "광고주": client_val,
+                            "품목": product_val,
+                            "빌링(억원)": billing_val,
+                            "빌링_원문": billing_raw,
+                            "기존사": incumbent_val,
+                            "참여사": participants_val,
+                            "선정사(결과)": winner_val,
+                            "메모(비고)": memo_val
+                        })
+        except Exception as e:
+            st.error(f"{f} 파싱 오류: {e}")
+
+    df_agency = pd.DataFrame()
+    df_tv = pd.DataFrame()
+
+    if os.path.exists(MASTER_SALES_FILE):
+        try:
+            df_m = pd.read_excel(MASTER_SALES_FILE)
+            df_m.columns = [str(c).strip() for c in df_m.
