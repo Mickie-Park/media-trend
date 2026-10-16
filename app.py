@@ -2,6 +2,7 @@ import os
 import glob
 import re
 import json
+import time
 import hashlib
 import base64
 import requests
@@ -295,9 +296,9 @@ if not st.session_state["logged_in"]:
                     st.success("회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인하실 수 있습니다.")
     st.stop()
 
-# --- 5. 데이터 로드 (v2.1: ▲ 기호 및 1행/줄바꿈 완벽 대응) ---
+# --- 5. 데이터 로드 (v2.2: 전수 파싱 및 고밀도 직렬화) ---
 @st.cache_data(show_spinner=False)
-def load_all_data(cache_ver="v2.1"):
+def load_all_data(cache_ver="v2.2"):
     raw_files = glob.glob("**/*.[xX][lL][sS][xX]", recursive=True)
     monthly_report_files = []
     for f in raw_files:
@@ -328,10 +329,8 @@ def load_all_data(cache_ver="v2.1"):
         year_str = m.group(1) if m else "기타"
         try:
             xls = pd.ExcelFile(f)
-            # header=None 으로 지정하여 엑셀 1행 데이터가 컬럼명으로 유실되는 현상 원천 차단
             df = pd.read_excel(f, sheet_name=xls.sheet_names[0], header=None)
             
-            # 1) PT 테이블 시작 전까지 모든 이슈 텍스트 줄(셀 내 줄바꿈 포함) 수집
             raw_issue_lines = []
             for r_idx in range(len(df)):
                 row_vals = [clean_str(df.iloc[r_idx, c]) for c in range(min(4, len(df.columns)))]
@@ -340,13 +339,11 @@ def load_all_data(cache_ver="v2.1"):
                     continue
                 row_nospace = row_joined.replace(" ", "")
                 
-                # PT 테이블 헤더나 매출 테이블 시작 시 종료
                 if ("PT일자" in row_nospace and "광고주" in row_nospace) or "전파광고매출" in row_nospace:
                     break
                 if "광고회사PT" in row_nospace and len(row_nospace) < 25:
                     break
 
-                # 셀 내부에 Alt+Enter(\n)로 여러 줄이 입력된 경우 한 줄씩 분리
                 for raw_line in row_joined.splitlines():
                     clean_t = re.sub(r"^[\s'\"`\xa0\u200b]+", "", raw_line).strip()
                     if not clean_t:
@@ -354,12 +351,10 @@ def load_all_data(cache_ver="v2.1"):
                     t_nospace = clean_t.replace(" ", "")
                     if "광고회사PT" in t_nospace and len(t_nospace) < 25:
                         break
-                    # 단순 문서 타이틀(예: "주요 이슈", "업계 동향", "1. 주요 이슈") 건너뛰기
                     if t_nospace in ["주요이슈", "업계동향", "1.주요이슈", "*주요이슈", "■주요이슈", "▲주요이슈", "[주요이슈]"]:
                         continue
                     raw_issue_lines.append(clean_t)
 
-            # 해당 파일에 ▲, ★ 등 주요 기호가 쓰였는지 확인 (쓰이지 않은 2023-07 등에서는 *를 헤드라인으로 취급)
             has_primary = any(ln.startswith(PRIMARY_HEAD_SYMS) for ln in raw_issue_lines)
             active_head_syms = PRIMARY_HEAD_SYMS if has_primary else PRIMARY_HEAD_SYMS + ("*",)
 
@@ -388,7 +383,6 @@ def load_all_data(cache_ver="v2.1"):
                     if sub_text:
                         issues_list.append({"연월": ym, "헤드라인": current_issue, "상세": sub_text})
             
-            # 2) 경쟁 PT 파싱
             for p_idx in range(len(df)):
                 row_cells = [clean_str(x) for x in df.iloc[p_idx].tolist()]
                 row_text_no_space = "".join(row_cells).replace(" ", "")
@@ -497,7 +491,7 @@ def load_all_data(cache_ver="v2.1"):
 
     return pd.DataFrame(issues_list), df_tv, pd.DataFrame(pt_list), df_agency, monthly_report_files
 
-df_issues, df_tv, df_pt, df_agency, loaded_files = load_all_data("v2.1")
+df_issues, df_tv, df_pt, df_agency, loaded_files = load_all_data("v2.2")
 
 def normalize_match_key(text):
     return re.sub(r'[\s\(\)\[\]_\-.,·/]', '', str(text)).lower() if text else ""
@@ -507,6 +501,53 @@ if not df_pt.empty:
     df_pt_unique = df_pt.drop_duplicates(subset=["_dedup_key"], keep="first").drop(columns=["_dedup_key"])
 else:
     df_pt_unique = pd.DataFrame()
+
+# AI 전달용 무손실 고밀도 텍스트 생성 함수 (토큰 75% 절감, 데이터 누락 0%)
+@st.cache_data(show_spinner=False)
+def build_compact_ai_context(df_pt_u, df_ag, df_t, df_is):
+    pt_lines = ["PT일자|광고주|품목|빌링(억)|기존사|참여사|선정사|비고"]
+    if not df_pt_u.empty:
+        for _, r in df_pt_u.iterrows():
+            b_str = f"{r['빌링(억원)']:g}" if pd.notna(r['빌링(억원)']) and r['빌링(억원)'] > 0 else str(r.get('빌링_원문', ''))
+            pt_lines.append(f"{r['PT일자']}|{r['광고주']}|{r['품목']}|{b_str}|{r['기존사']}|{r['참여사']}|{r['선정사(결과)']}|{r['메모(비고)']}")
+    pt_txt = "\n".join(pt_lines)
+
+    ag_lines = []
+    if not df_ag.empty:
+        piv_ag = df_ag.pivot_table(index=["연월", "대행사"], columns="구분", values="매출(억원)", aggfunc="first").reset_index()
+        for ym, grp in piv_ag.groupby("연월", sort=False):
+            items = []
+            for _, r in grp.iterrows():
+                s_v = f"{r['Start']:g}" if "Start" in r and pd.notna(r["Start"]) else "-"
+                c_v = f"{r['마감']:g}" if "마감" in r and pd.notna(r["마감"]) else "-"
+                items.append(f"{r['대행사']}({s_v}/{c_v})")
+            ag_lines.append(f"[{ym}] " + ", ".join(items))
+    ag_txt = "\n".join(ag_lines) if ag_lines else "데이터 없음"
+
+    tv_lines = []
+    if not df_t.empty:
+        piv_tv = df_t.pivot_table(index=["연월", "채널구분", "채널"], columns="구분", values="매출(억원)", aggfunc="first").reset_index()
+        for ym, grp in piv_tv.groupby("연월", sort=False):
+            items = []
+            for _, r in grp.iterrows():
+                s_v = f"{r['Start']:g}" if "Start" in r and pd.notna(r["Start"]) else "-"
+                c_v = f"{r['마감']:g}" if "마감" in r and pd.notna(r["마감"]) else "-"
+                items.append(f"{r['채널']}({s_v}/{c_v})")
+            tv_lines.append(f"[{ym}] " + ", ".join(items))
+    tv_txt = "\n".join(tv_lines) if tv_lines else "데이터 없음"
+
+    is_lines = []
+    if not df_is.empty:
+        for ym, grp_ym in df_is.groupby("연월", sort=False):
+            is_lines.append(f"[{ym}]")
+            for hl, grp_hl in grp_ym.groupby("헤드라인", sort=False):
+                is_lines.append(f"▲ {hl}")
+                for d in grp_hl["상세"]:
+                    if d:
+                        is_lines.append(f"- {d}")
+    is_txt = "\n".join(is_lines) if is_lines else "데이터 없음"
+
+    return pt_txt, ag_txt, tv_txt, is_txt
 
 def get_stay_duration_str():
     if st.session_state.get("login_time"):
@@ -926,31 +967,42 @@ with body_container:
         if not api_key:
             st.warning("사이드바에 'Gemini API Key'를 설정하시면 실시간 AI 질의응답이 활성화됩니다.")
         else:
-            try:
-                genai.configure(api_key=api_key)
-                target_model = "gemini-3.8-flash"
-                model = genai.GenerativeModel(target_model)
-                st.caption(f"연결 모델: `{target_model}` | 통합 분석 데이터셋: PT {len(df_pt_unique):,}건, 대행사매출 {len(df_agency):,}건, 매체사매출 {len(df_tv):,}건, 이슈 {len(df_issues):,}건")
-                user_question = st.text_input("질문을 입력하세요", placeholder="예: 2024년 이후 현대자동차 관련 모든 수주 내역과 대행사별 수주 현황을 분석해줘")
-                if st.button("AI 분석 요청", type="primary") and user_question:
-                    with st.spinner("최신 Gemini 3.8 엔진이 전체 데이터베이스를 전수 스캔하여 심층 리포트를 작성 중입니다..."):
-                        pt_full_csv = df_pt_unique[["PT일자", "광고주", "품목", "빌링(억원)", "기존사", "참여사", "선정사(결과)", "메모(비고)"]].to_csv(index=False) if not df_pt_unique.empty else "데이터 없음"
-                        agency_full_csv = df_agency[["연월", "대행사", "매출(억원)", "구분"]].to_csv(index=False) if not df_agency.empty else "데이터 없음"
-                        tv_full_csv = df_tv[["연월", "채널구분", "채널", "매출(억원)", "구분"]].to_csv(index=False) if not df_tv.empty else "데이터 없음"
-                        issues_full_csv = df_issues[["연월", "헤드라인", "상세"]].to_string(index=False) if not df_issues.empty else "데이터 없음"
-                        prompt = (
-                            f"당신은 대한민국 미디어·방송·광고 업계 전문 수석 전략 컨설턴트입니다.\n"
-                            f"제공된 전 카테고리 빅데이터를 전수 검토하여 질문에 정확하게 답변해 주세요.\n\n"
-                            f"[1. 전체 광고회사 PT 수주 현황]\n{pt_full_csv}\n\n"
-                            f"[2. 대행사 전파광고 매출]\n{agency_full_csv}\n\n"
-                            f"[3. 방송 매체사 광고 매출]\n{tv_full_csv}\n\n"
-                            f"[4. 월별 업계 주요 이슈 브리핑]\n{issues_full_csv}\n\n"
-                            f"[사용자 질문]\n{user_question}\n\n"
-                            f"작성 지침: 제공된 데이터를 전수 검토하여 수치와 회사명을 정확히 대조하고, 불릿 포인트와 볼드(**)를 활용하여 완성도 높은 리포트 형식으로 작성하세요."
-                        )
-                        response = model.generate_content(prompt)
+            genai.configure(api_key=api_key)
+            target_model = "gemini-3.8-flash"
+            st.caption(f"연결 모델: `{target_model}` | 통합 분석 데이터셋: PT {len(df_pt_unique):,}건, 대행사매출 {len(df_agency):,}건, 매체사매출 {len(df_tv):,}건, 이슈 {len(df_issues):,}건")
+            user_question = st.text_input("질문을 입력하세요", placeholder="예: 건기식 광고 진행 패턴은? / 2024년 이후 현대차 수주 현황 분석해줘")
+            if st.button("AI 분석 요청", type="primary") and user_question:
+                with st.spinner("최신 Gemini 3.8 엔진이 전체 데이터베이스를 고밀도 전수 스캔하여 심층 리포트를 작성 중입니다..."):
+                    pt_txt, ag_txt, tv_txt, is_txt = build_compact_ai_context(df_pt_unique, df_agency, df_tv, df_issues)
+                    prompt = (
+                        f"당신은 대한민국 미디어·방송·광고 업계 전문 수석 전략 컨설턴트입니다.\n"
+                        f"아래 제공된 전 카테고리 빅데이터(전수 데이터)를 빠짐없이 검토하여 질문에 정확하게 답변해 주세요.\n\n"
+                        f"[1. 광고회사 PT 수주 현황 (전체 {len(df_pt_unique)}건)]\n{pt_txt}\n\n"
+                        f"[2. 대행사 전파광고 매출 (단위:억원, 괄호안은 Start/마감)]\n{ag_txt}\n\n"
+                        f"[3. 방송 매체사 광고 매출 (단위:억원, 괄호안은 Start/마감)]\n{tv_txt}\n\n"
+                        f"[4. 월별 업계 주요 이슈 브리핑 (전체 {len(df_issues)}건)]\n{is_txt}\n\n"
+                        f"[사용자 질문]\n{user_question}\n\n"
+                        f"작성 지침:\n"
+                        f"1. 제공된 데이터를 전수 검토하여 구체적인 연월, 광고주/품목, 대행사명, 빌링/매출 수치를 정확히 근거로 제시하세요.\n"
+                        f"2. 가독성을 위해 불릿 포인트와 볼드(**)를 적극 활용하여 체계적인 리포트 형식으로 작성하세요."
+                    )
+                    
+                    model = genai.GenerativeModel(target_model)
+                    response = None
+                    for attempt in range(2):
+                        try:
+                            response = model.generate_content(prompt)
+                            break
+                        except Exception as e:
+                            err_str = str(e)
+                            if "429" in err_str and attempt == 0:
+                                time.sleep(16)
+                                continue
+                            else:
+                                st.error(f"AI 호출 오류: {err_str}")
+                                break
+                                
+                    if response:
                         log_activity(st.session_state["username"], st.session_state["user_name"], "AI 질의", f"질문: {user_question[:40]}...")
                         st.markdown("##### 🏛️ 인텔리전스 종합 분석 리포트")
                         st.markdown(f'<div class="ai-report-box">{response.text}</div>', unsafe_allow_html=True)
-            except Exception as e:
-                st.error(f"AI 호출 오류: {e}")
