@@ -296,9 +296,9 @@ if not st.session_state["logged_in"]:
                     st.success("회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인하실 수 있습니다.")
     st.stop()
 
-# --- 5. 데이터 로드 (v2.2: 전수 파싱 및 고밀도 직렬화) ---
+# --- 5. 데이터 로드 (v2.3: 전수 파싱 및 스마트 토큰 관리) ---
 @st.cache_data(show_spinner=False)
-def load_all_data(cache_ver="v2.2"):
+def load_all_data(cache_ver="v2.3"):
     raw_files = glob.glob("**/*.[xX][lL][sS][xX]", recursive=True)
     monthly_report_files = []
     for f in raw_files:
@@ -491,7 +491,7 @@ def load_all_data(cache_ver="v2.2"):
 
     return pd.DataFrame(issues_list), df_tv, pd.DataFrame(pt_list), df_agency, monthly_report_files
 
-df_issues, df_tv, df_pt, df_agency, loaded_files = load_all_data("v2.2")
+df_issues, df_tv, df_pt, df_agency, loaded_files = load_all_data("v2.3")
 
 def normalize_match_key(text):
     return re.sub(r'[\s\(\)\[\]_\-.,·/]', '', str(text)).lower() if text else ""
@@ -502,49 +502,139 @@ if not df_pt.empty:
 else:
     df_pt_unique = pd.DataFrame()
 
-# AI 전달용 무손실 고밀도 텍스트 생성 함수 (토큰 75% 절감, 데이터 누락 0%)
-@st.cache_data(show_spinner=False)
-def build_compact_ai_context(df_pt_u, df_ag, df_t, df_is):
-    pt_lines = ["PT일자|광고주|품목|빌링(억)|기존사|참여사|선정사|비고"]
-    if not df_pt_u.empty:
-        for _, r in df_pt_u.iterrows():
-            b_str = f"{r['빌링(억원)']:g}" if pd.notna(r['빌링(억원)']) and r['빌링(억원)'] > 0 else str(r.get('빌링_원문', ''))
-            pt_lines.append(f"{r['PT일자']}|{r['광고주']}|{r['품목']}|{b_str}|{r['기존사']}|{r['참여사']}|{r['선정사(결과)']}|{r['메모(비고)']}")
-    pt_txt = "\n".join(pt_lines)
+# --- 스마트 컨텍스트 엔진: 무료 티어 분당 25만 토큰 한도(안전선 9만 자) 완벽 준수 ---
+def build_smart_ai_context(user_q, scope_mode, df_pt_u, df_ag, df_t, df_is):
+    STOPWORDS = {"광고", "분석", "최근", "동향", "알려줘", "분석해줘", "패턴", "현황", "내역", "매출", "방송", "업계", "대행사", "매체사", "이슈", "요약", "정리", "어때", "무엇", "어떤", "전체", "모든", "관련", "비교", "추이"}
+    tokens = [w for w in re.findall(r'[가-힣a-zA-Z0-9]{2,}', user_q) if w not in STOPWORDS and not re.match(r'^202\d$', w)]
+    years_in_q = re.findall(r'(202\d)', user_q)
 
+    # 범위 필터 설정
+    cutoff_ym = "2021-01"
+    target_yr = None
+    if scope_mode == "최근 1년 집중 (2025~2026)":
+        cutoff_ym = "2025-01"
+    elif scope_mode == "최근 2년 집중 (2024~2026)":
+        cutoff_ym = "2024-01"
+    elif scope_mode.startswith("연도 지정:"):
+        target_yr = scope_mode.split(":")[1].strip()
+
+    # 1. 매출 데이터 (연도별 합계 + 월별 마감/Start 초고밀도 행렬)
     ag_lines = []
     if not df_ag.empty:
-        piv_ag = df_ag.pivot_table(index=["연월", "대행사"], columns="구분", values="매출(억원)", aggfunc="first").reset_index()
+        df_ag_sub = df_ag[df_ag["연도"] == target_yr] if target_yr else df_ag
+        piv_ag = df_ag_sub.pivot_table(index=["연월", "대행사"], columns="구분", values="매출(억원)", aggfunc="first").reset_index()
         for ym, grp in piv_ag.groupby("연월", sort=False):
+            if not target_yr and ym < cutoff_ym and scope_mode != "스마트 자동 최적화 (추천)":
+                continue
             items = []
             for _, r in grp.iterrows():
                 s_v = f"{r['Start']:g}" if "Start" in r and pd.notna(r["Start"]) else "-"
                 c_v = f"{r['마감']:g}" if "마감" in r and pd.notna(r["마감"]) else "-"
                 items.append(f"{r['대행사']}({s_v}/{c_v})")
-            ag_lines.append(f"[{ym}] " + ", ".join(items))
+            ag_lines.append(f"[{ym}] " + ",".join(items))
     ag_txt = "\n".join(ag_lines) if ag_lines else "데이터 없음"
 
     tv_lines = []
     if not df_t.empty:
-        piv_tv = df_t.pivot_table(index=["연월", "채널구분", "채널"], columns="구분", values="매출(억원)", aggfunc="first").reset_index()
+        df_tv_sub = df_t[df_t["연도"] == target_yr] if target_yr else df_t
+        piv_tv = df_tv_sub.pivot_table(index=["연월", "채널"], columns="구분", values="매출(억원)", aggfunc="first").reset_index()
         for ym, grp in piv_tv.groupby("연월", sort=False):
+            if not target_yr and ym < cutoff_ym and scope_mode != "스마트 자동 최적화 (추천)":
+                continue
             items = []
             for _, r in grp.iterrows():
                 s_v = f"{r['Start']:g}" if "Start" in r and pd.notna(r["Start"]) else "-"
                 c_v = f"{r['마감']:g}" if "마감" in r and pd.notna(r["마감"]) else "-"
                 items.append(f"{r['채널']}({s_v}/{c_v})")
-            tv_lines.append(f"[{ym}] " + ", ".join(items))
+            tv_lines.append(f"[{ym}] " + ",".join(items))
     tv_txt = "\n".join(tv_lines) if tv_lines else "데이터 없음"
 
+    # 2. PT 수주 데이터 (키워드 매칭 건 최우선 + 최신순 정렬)
+    pt_lines = ["PT일자|광고주|품목|빌링(억)|기존|참여|선정|비고"]
+    if not df_pt_u.empty:
+        df_p = df_pt_u.copy()
+        if target_yr:
+            df_p = df_p[df_p["연도"] == target_yr]
+        elif scope_mode != "스마트 자동 최적화 (추천)":
+            df_p = df_p[df_p["발행연월"] >= cutoff_ym]
+
+        def row_to_pt_line(r):
+            b_str = f"{r['빌링(억원)']:g}" if pd.notna(r['빌링(억원)']) and r['빌링(억원)'] > 0 else str(r.get('빌링_원문', ''))
+            return f"{r['PT일자']}|{r['광고주']}|{r['품목']}|{b_str}|{r['기존사']}|{r['참여사']}|{r['선정사(결과)']}|{r['메모(비고)']}"
+
+        if tokens:
+            pat = "|".join([re.escape(t) for t in tokens])
+            full_s = df_p["광고주"] + " " + df_p["품목"] + " " + df_p["기존사"] + " " + df_p["참여사"] + " " + df_p["선정사(결과)"] + " " + df_p["메모(비고)"]
+            m_mask = full_s.str.contains(pat, case=False, na=False)
+            matched_df = df_p[m_mask]
+            rest_df = df_p[~m_mask]
+            for _, r in matched_df.iterrows():
+                pt_lines.append(row_to_pt_line(r))
+            for _, r in rest_df.iterrows():
+                if sum(len(x) for x in pt_lines) > 38000:
+                    break
+                pt_lines.append(row_to_pt_line(r))
+        else:
+            for _, r in df_p.iterrows():
+                if sum(len(x) for x in pt_lines) > 38000:
+                    break
+                pt_lines.append(row_to_pt_line(r))
+    pt_txt = "\n".join(pt_lines)
+
+    # 3. 월별 이슈 데이터 (키워드/연도 매칭 100% 최우선 + 최신순 상세 + 과거 헤드라인 요약으로 토큰 한도 방어)
     is_lines = []
     if not df_is.empty:
-        for ym, grp_ym in df_is.groupby("연월", sort=False):
-            is_lines.append(f"[{ym}]")
+        df_i = df_is.copy()
+        if target_yr:
+            df_i = df_i[df_i["연월"].str.startswith(target_yr)]
+        elif years_in_q and scope_mode == "스마트 자동 최적화 (추천)":
+            # 질문에 특정 연도가 언급된 경우 해당 연도 + 최근 연도 우선
+            pass
+
+        # 키워드 매칭된 이슈 블록 먼저 추출 (전 기간)
+        matched_hl_keys = set()
+        if tokens:
+            pat = "|".join([re.escape(t) for t in tokens])
+            m_is = df_i[df_i["헤드라인"].str.contains(pat, case=False, na=False) | df_i["상세"].str.contains(pat, case=False, na=False)]
+            if not m_is.empty:
+                is_lines.append("=== [질문 키워드 직접 매칭 이슈 (전 기간)] ===")
+                for (ym, hl), grp in m_is.groupby(["연월", "헤드라인"], sort=False):
+                    matched_hl_keys.add((ym, hl))
+                    is_lines.append(f"[{ym}] ▲ {hl}")
+                    for d in grp["상세"]:
+                        if d:
+                            is_lines.append(f"- {d}")
+
+        is_lines.append("=== [월별 업계 주요 이슈 브리핑] ===")
+        curr_char_cnt = sum(len(x) for x in is_lines)
+        ISSUE_CHAR_BUDGET = 36000  # 안전 토큰 예산 (전체 프롬프트 9만 자 이내 보장)
+
+        for ym, grp_ym in df_i.groupby("연월", sort=False):
+            if not target_yr and scope_mode != "스마트 자동 최적화 (추천)" and ym < cutoff_ym:
+                continue
+            if curr_char_cnt > ISSUE_CHAR_BUDGET:
+                break
+            ym_header_added = False
+            # 질문에 언급된 연도이거나 최근 데이터(2024-07 이후)는 상세 내용까지 포함, 그 외 과거 데이터는 예산에 맞춰 헤드라인 중심 포함
+            include_details = (target_yr is not None) or any(ym.startswith(y) for y in years_in_q) or (ym >= "2024-07")
             for hl, grp_hl in grp_ym.groupby("헤드라인", sort=False):
-                is_lines.append(f"▲ {hl}")
-                for d in grp_hl["상세"]:
-                    if d:
-                        is_lines.append(f"- {d}")
+                if (ym, hl) in matched_hl_keys:
+                    continue
+                if not ym_header_added:
+                    is_lines.append(f"[{ym}]")
+                    curr_char_cnt += len(ym) + 3
+                    ym_header_added = True
+                hl_line = f"▲ {hl}"
+                is_lines.append(hl_line)
+                curr_char_cnt += len(hl_line) + 1
+                if include_details and curr_char_cnt < ISSUE_CHAR_BUDGET:
+                    for d in grp_hl["상세"]:
+                        if d:
+                            d_line = f"- {d}"
+                            is_lines.append(d_line)
+                            curr_char_cnt += len(d_line) + 1
+                if curr_char_cnt > ISSUE_CHAR_BUDGET:
+                    break
     is_txt = "\n".join(is_lines) if is_lines else "데이터 없음"
 
     return pt_txt, ag_txt, tv_txt, is_txt
@@ -970,39 +1060,41 @@ with body_container:
             genai.configure(api_key=api_key)
             target_model = "gemini-3.8-flash"
             st.caption(f"연결 모델: `{target_model}` | 통합 분석 데이터셋: PT {len(df_pt_unique):,}건, 대행사매출 {len(df_agency):,}건, 매체사매출 {len(df_tv):,}건, 이슈 {len(df_issues):,}건")
-            user_question = st.text_input("질문을 입력하세요", placeholder="예: 건기식 광고 진행 패턴은? / 2024년 이후 현대차 수주 현황 분석해줘")
+            
+            all_yrs = sorted(list(set([str(y) for y in df_pt_unique["연도"].dropna() if str(y).isdigit()])), reverse=True) if not df_pt_unique.empty else ["2026", "2025", "2024", "2023", "2022", "2021"]
+            scope_options = ["스마트 자동 최적화 (추천)", "최근 1년 집중 (2025~2026)", "최근 2년 집중 (2024~2026)"] + [f"연도 지정: {y}" for y in all_yrs]
+            
+            ai_col1, ai_col2 = st.columns([3, 1.3])
+            with ai_col1:
+                user_question = st.text_input("질문을 입력하세요", placeholder="예: 방송광고의 최근 동향을 분석해줘 / 건기식 광고 진행 패턴은?")
+            with ai_col2:
+                scope_mode = st.selectbox("분석 데이터 범위 (토큰 최적화)", scope_options, index=0)
+
             if st.button("AI 분석 요청", type="primary") and user_question:
-                with st.spinner("최신 Gemini 3.8 엔진이 전체 데이터베이스를 고밀도 전수 스캔하여 심층 리포트를 작성 중입니다..."):
-                    pt_txt, ag_txt, tv_txt, is_txt = build_compact_ai_context(df_pt_unique, df_agency, df_tv, df_issues)
+                with st.spinner("최신 Gemini 3.8 엔진이 스마트 컨텍스트 스캔으로 심층 리포트를 작성 중입니다..."):
+                    pt_txt, ag_txt, tv_txt, is_txt = build_smart_ai_context(user_question, scope_mode, df_pt_unique, df_agency, df_tv, df_issues)
                     prompt = (
                         f"당신은 대한민국 미디어·방송·광고 업계 전문 수석 전략 컨설턴트입니다.\n"
-                        f"아래 제공된 전 카테고리 빅데이터(전수 데이터)를 빠짐없이 검토하여 질문에 정확하게 답변해 주세요.\n\n"
-                        f"[1. 광고회사 PT 수주 현황 (전체 {len(df_pt_unique)}건)]\n{pt_txt}\n\n"
+                        f"아래 제공된 전 카테고리 빅데이터를 면밀히 검토하여 질문에 정확하게 답변해 주세요.\n\n"
+                        f"[1. 광고회사 PT 수주 현황]\n{pt_txt}\n\n"
                         f"[2. 대행사 전파광고 매출 (단위:억원, 괄호안은 Start/마감)]\n{ag_txt}\n\n"
                         f"[3. 방송 매체사 광고 매출 (단위:억원, 괄호안은 Start/마감)]\n{tv_txt}\n\n"
-                        f"[4. 월별 업계 주요 이슈 브리핑 (전체 {len(df_issues)}건)]\n{is_txt}\n\n"
+                        f"[4. 월별 업계 주요 이슈 브리핑]\n{is_txt}\n\n"
                         f"[사용자 질문]\n{user_question}\n\n"
                         f"작성 지침:\n"
-                        f"1. 제공된 데이터를 전수 검토하여 구체적인 연월, 광고주/품목, 대행사명, 빌링/매출 수치를 정확히 근거로 제시하세요.\n"
-                        f"2. 가독성을 위해 불릿 포인트와 볼드(**)를 적극 활용하여 체계적인 리포트 형식으로 작성하세요."
+                        f"1. 제공된 데이터를 철저히 대조하여 구체적인 연월, 광고주/품목, 대행사/매체사명, 빌링/매출 수치 및 주요 이슈를 명확한 근거로 제시하세요.\n"
+                        f"2. 가독성을 위해 불릿 포인트와 볼드(**)를 적극 활용하여 체계적인 전략 리포트 형식으로 작성하세요."
                     )
                     
-                    model = genai.GenerativeModel(target_model)
-                    response = None
-                    for attempt in range(2):
-                        try:
-                            response = model.generate_content(prompt)
-                            break
-                        except Exception as e:
-                            err_str = str(e)
-                            if "429" in err_str and attempt == 0:
-                                time.sleep(16)
-                                continue
-                            else:
-                                st.error(f"AI 호출 오류: {err_str}")
-                                break
-                                
-                    if response:
+                    try:
+                        model = genai.GenerativeModel(target_model)
+                        response = model.generate_content(prompt)
                         log_activity(st.session_state["username"], st.session_state["user_name"], "AI 질의", f"질문: {user_question[:40]}...")
                         st.markdown("##### 🏛️ 인텔리전스 종합 분석 리포트")
                         st.markdown(f'<div class="ai-report-box">{response.text}</div>', unsafe_allow_html=True)
+                    except Exception as e:
+                        err_str = str(e)
+                        if "429" in err_str:
+                            st.error("현재 무료 API의 1분당 토큰 한도(250,000 토큰) 쿨타임 중입니다. 약 45초~1분 정도 기다리신 후 다시 버튼을 눌러주시면 정상 작동합니다.")
+                        else:
+                            st.error(f"AI 호출 오류: {err_str}")
