@@ -58,5 +58,11 @@
         "password": "2981b4cd4fa94a181ebb53d625e8a5c380add9223fceb71c8b2fbbdab29190a8",
         "role": "member",
         "approved": true
+    },
+    "junghkim@sk.com": {
+        "name": "김정현",
+        "password": "adb9517953324b082aa143e5b484450545763d46975bb7b75f6137936b8faccb",
+        "role": "member",
+        "approved": false
     }
 }
