@@ -509,5 +509,12 @@
         "name": "마스터 관리자",
         "action": "회원 승인",
         "details": "승인: junghkim@sk.com"
+    },
+    {
+        "timestamp": "2026-11-06 09:16:08",
+        "username": "junghkim@sk.com",
+        "name": "김정현",
+        "action": "로그인",
+        "details": "시스템 로그인 성공"
     }
 ]
