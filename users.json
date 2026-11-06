@@ -63,6 +63,6 @@
         "name": "김정현",
         "password": "adb9517953324b082aa143e5b484450545763d46975bb7b75f6137936b8faccb",
         "role": "member",
-        "approved": false
+        "approved": true
     }
 }
